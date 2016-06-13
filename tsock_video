@@ -1,0 +1,62 @@
+#!/bin/bash
+
+puits=false
+sourc=false
+protocol="tcp"
+
+usage() { echo "Usage: $0 [[-p|-s] [-t (tcp|mictcp)]" 1>&2; exit 1; }
+
+while getopts "pst:" o; do 
+	case "${o}" in
+		t)
+	         	protocol=${OPTARG}
+			if [ "$protocol" != "tcp" ] && [ "$protocol" != "mictcp" ]; then 
+				usage
+				exit 1
+			fi
+			;;
+	        p)
+	                puits=true 
+	                ;;
+	        s)
+	                sourc=true 
+	                ;;
+	        *)
+		        usage
+		        ;;
+	esac
+done
+
+if ([ "$puits" = true ] && [ "$sourc" = true ]) || ([ "$puits" = false ] && [ "$sourc" = false ])  ; then
+	usage
+	exit 1
+fi
+
+if [ "$puits" = true ]; then
+
+    echo "Lancement du puits, protocole " $protocol
+    cvlc rtp://127.0.0.1:1234 > /dev/null 2>&1 &
+
+    if [ "$protocol" = "mictcp" ]; then
+        cd build
+        ./gateway -p -t $protocol 1234 &
+	cd ..
+    fi
+fi
+
+if [ "$sourc" = true ]; then
+
+    echo "Lancement de la source, protocol " $protocol
+    cd build
+    ./gateway -s -t $protocol 127.0.0.1 1234 &
+    cd ..
+fi
+
+echo "Appuyez sur ENTREE pour arreter"
+read line 
+
+echo "Arret"
+killall -9 cvlc > /dev/null 2>&1
+killall -9 vlc > /dev/null 2>&1
+killall -9 gateway > /dev/null 2>&1
+
