@@ -1,5 +1,6 @@
 #include <api/mictcp_core.h>
 #include <sys/time.h>
+#include <sys/queue.h>
 #include <time.h>
 #include <pthread.h>
 #include <strings.h>
@@ -28,10 +29,13 @@ struct sockaddr_in local_addr, remote_addr, tmp_addr;
 socklen_t local_size, remote_size; 
 socklen_t tmp_addr_size = sizeof(struct sockaddr);
 
-app_buffer* app_buffer_first = NULL;
-app_buffer* app_buffer_last = NULL;
-unsigned int app_buffer_size = 0;
-unsigned int app_buffer_count = 0;
+/* This is for the buffer */
+TAILQ_HEAD(tailhead, app_buffer_entry) app_buffer_head;
+struct tailhead *headp;
+struct app_buffer_entry {
+     mic_tcp_payload bf;
+     TAILQ_ENTRY(app_buffer_entry) entries;
+};
 
 /*************************
  * Fonctions Utilitaires *
@@ -46,6 +50,7 @@ int initialize_components(start_mode mode)
     
     if((mode == SERVER) & (initialized != -1))
     {        
+        TAILQ_INIT(&app_buffer_head);
         memset((char *) &local_addr, 0, sizeof(local_addr));
         local_addr.sin_family = AF_INET;
         local_addr.sin_port = htons(API_CS_Port);
@@ -207,69 +212,55 @@ int partial_send(mic_tcp_payload buff)
 
 int app_buffer_get(mic_tcp_payload app_buff)
 {
-    mic_tcp_payload tmp;
-    app_buffer* current;
+    /* A pointer to a buffer entry */
+    struct app_buffer_entry * entry;
 
-    while(app_buffer_count == 0)
-    {
-        usleep(1000);
+    /* The actual size passed to the application */
+    int result = 0;
+
+    /* If the buffer is empty, we wait for insertion */
+    while(app_buffer_head.tqh_first == NULL) {
+          usleep(1000);
     }
 
-    if(app_buffer_count > 0)    
-    {
-        pthread_mutex_lock(&lock);
-        tmp.size = app_buffer_first->packet.size;
-        tmp.data = app_buffer_first->packet.data;
+    /* The entry we want is the first one in the buffer */
+    entry = app_buffer_head.tqh_first;
+   
+    /* How much data are we going to deliver to the application ? */
+    result = min_size(entry->bf.size, app_buff.size);
 
-        current = app_buffer_first;
-        if(app_buffer_count == 1)
-        {
-            app_buffer_first = app_buffer_last = NULL;
-        }
-        else
-        {            
-            app_buffer_first = app_buffer_first->next;
-        }
+    /* We copy the actual data in the application allocated buffer */
+    memcpy(app_buff.data, entry->bf.data, result);
 
-        memcpy(app_buff.data, tmp.data, min_size(tmp.size, app_buff.size));
+    /* Lock a mutex to protect the buffer from corruption */
+    pthread_mutex_lock(&lock);
 
-        app_buffer_size -= tmp.size;
-        app_buffer_count --;
-        free(current);
-        free(tmp.data);
-        
-        pthread_mutex_unlock(&lock);  
-        
-    }      
-
-    return tmp.size;       
+    /* We remove the entry from the buffer */ 
+    TAILQ_REMOVE(&app_buffer_head, entry, entries);
+    
+    /* Release the mutex */ 
+    pthread_mutex_unlock(&lock);
+  
+    /* Clean up memory */
+    free(entry->bf.data);
+    free(entry);
+ 
+    return result;
 }
 
 void app_buffer_set(mic_tcp_payload bf)
 {
-    
+    /* Prepare a buffer entry to store the data */
+    struct app_buffer_entry * entry = malloc(sizeof(struct app_buffer_entry));
+    entry->bf = bf;
+
+    /* Lock a mutex to protect the buffer from corruption */
     pthread_mutex_lock(&lock);
-    
-    app_buffer* tmp = malloc(sizeof(app_buffer));
-    tmp->packet.size = bf.size;
-    tmp->packet.data = malloc(bf.size);
-    tmp->id = global_id++;
-    memcpy(tmp->packet.data, bf.data, bf.size);
-    tmp->next = NULL; 
-    
-    if(app_buffer_count == 0)
-    {
-        app_buffer_first = app_buffer_last = tmp; 
-    }
-    else
-    {
-        app_buffer_last->next = tmp;
-        app_buffer_last = tmp;   
-    }
-    
-    app_buffer_size += bf.size;
-    app_buffer_count ++;
-    
+
+    /* Insert the packet in the buffer, at the end of it */
+    TAILQ_INSERT_TAIL(&app_buffer_head, entry, entries);	
+   
+    /* Release the mutex */
     pthread_mutex_unlock(&lock);
 }
 
