@@ -1,5 +1,14 @@
+DATE := `date +'%Y%m%d'`
+TAG := moodle-$(USER)
+
+ifneq ($(tag),)
+        TAG := $(TAG)-$(tag)
+endif
+
 CC        := gcc
 LD        := gcc
+
+TAR_FILENAME := $(DATE)-mictcp-$(TAG).tar.gz
 
 MODULES   := api apps 
 SRC_DIR   := $(addprefix src/,$(MODULES)) src
@@ -40,4 +49,15 @@ $(BUILD_DIR):
 clean:
 	@rm -rf $(BUILD_DIR)
 
+distclean:
+	@rm -rf $(BUILD_DIR)
+	@-rm -f *.tar.gz || true 
+
+
 $(foreach bdir,$(BUILD_DIR),$(eval $(call make-goal,$(bdir))))
+
+dist:
+	@tar --exclude=build --exclude=*tar.gz --exclude=.git* -czvf mictcp-bundle.tar.gz ../mictcp
+
+prof:
+	@tar --exclude=build --exclude=.*tar.gz --exclude=video -czvf $(TAR_FILENAME) ../mictcp
