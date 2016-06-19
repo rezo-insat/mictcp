@@ -241,9 +241,10 @@ void file_to_mictcp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to
      struct timespec currentTime;
      struct timespec rem;
      int firstValue = 0;
+     int active = 1;
 
-     // Main activity loop, we never exit this, user terminates with SIGKILL
-     while(1) {
+     // Main activity loop, we exit this at the end of the file
+     while(active) {
           bzero(buffer, MAX_UDP_SEGMENT_SIZE);
 
 	  n = fread(&currentTimeFile, 1, sizeof(struct timespec), fd);
@@ -266,8 +267,11 @@ void file_to_mictcp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to
 	  lastTimeFile = currentTimeFile;
           n = fread(buffer, 1, sizeof(n), fd);
           n = fread(buffer, 1, *((int *)buffer), fd);
-          if (n < 0) {
-               perror(0); 
+          if (n <= 0) {
+               if(n < 0) {
+                    perror(0);
+               }
+               active = 0;
           }
 
           // We forward the packet to its final destination
@@ -277,7 +281,7 @@ void file_to_mictcp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to
           } 
      }
 
-     // We never execute this but anyway, for sanity
+     // We execute this when the file has finished being replayed 
      close(listen_sockfd);
       
      // Same for MICTCP
