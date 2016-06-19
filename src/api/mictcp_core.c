@@ -25,7 +25,8 @@ int count = 0;
 int reverse = 1;
 
 struct sockaddr_in local_addr, remote_addr, tmp_addr;
-int local_size, remote_size, tmp_addr_size;
+socklen_t local_size, remote_size; 
+socklen_t tmp_addr_size = sizeof(struct sockaddr);
 
 app_buffer* app_buffer_first = NULL;
 app_buffer* app_buffer_last = NULL;
