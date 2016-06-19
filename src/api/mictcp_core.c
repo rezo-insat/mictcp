@@ -8,26 +8,16 @@
 /*****************
  * API Variables *
  *****************/
-int first_free = 0;
 int initialized = -1;
 int sys_socket;
-unsigned short API_CS_Port = 8524;
-unsigned short API_SC_Port = 8525;
-float reliability = 100;
-mic_tcp_sock current_socket;
-int exite_status = -1;
 pthread_t listen_th;
 pthread_mutex_t lock;
-unsigned int global_id = 0;
-unsigned short  loss_rate = 0;
+float  loss_rate = 0.0f;
 float jump = 0;
 float range = 0;
 int count = 0;
 int reverse = 1;
 
-struct sockaddr_in local_addr, remote_addr, tmp_addr;
-socklen_t local_size, remote_size; 
-socklen_t tmp_addr_size = sizeof(struct sockaddr);
 
 /* This is for the buffer */
 TAILQ_HEAD(tailhead, app_buffer_entry) app_buffer_head;
@@ -43,7 +33,10 @@ struct app_buffer_entry {
 int initialize_components(start_mode mode)
 {
     int bnd;
+    struct sockaddr_in local_addr;
+    struct sockaddr_in remote_addr;
     struct hostent * hp;
+
     if(initialized != -1) return initialized;    
     if((sys_socket = socket(AF_INET, SOCK_DGRAM, 0)) == -1) return -1;
     else initialized = 1;
@@ -68,7 +61,6 @@ int initialize_components(start_mode mode)
             remote_addr.sin_port = htons(API_SC_Port);
             hp = gethostbyname("localhost");
             memcpy (&(remote_addr.sin_addr.s_addr), hp->h_addr, hp->h_length);
-            remote_size = sizeof(remote_addr);
             initialized = 1;
         } 
         
@@ -83,7 +75,6 @@ int initialize_components(start_mode mode)
             remote_addr.sin_port = htons(API_CS_Port);
             hp = gethostbyname("localhost");
             memcpy (&(remote_addr.sin_addr.s_addr), hp->h_addr, hp->h_length);
-            remote_size = sizeof(remote_addr);
             
             memset((char *) &local_addr, 0, sizeof(local_addr));
             local_addr.sin_family = AF_INET;
@@ -121,6 +112,8 @@ int IP_send(mic_tcp_pdu pk, mic_tcp_sock_addr addr)
 int IP_recv(mic_tcp_payload* pk,mic_tcp_sock_addr* addr, unsigned long delay)
 {
     struct timeval tv;
+    struct sockaddr_in tmp_addr;
+    socklen_t tmp_addr_size = sizeof(struct sockaddr);
 
     /* Send data over a fake IP */
     if(initialized == -1) return -1;
@@ -181,33 +174,26 @@ mic_tcp_payload get_data(mic_tcp_payload packet)
 
 int full_send(mic_tcp_payload buff)
 {
-    return sendto(sys_socket, buff.data, buff.size, 0, (struct sockaddr *)&remote_addr, remote_size);
+    struct sockaddr_in remote_addr;
+    int result = 0;
+
+    result = sendto(sys_socket, buff.data, buff.size, 0, (struct sockaddr *)&remote_addr, sizeof(struct sockaddr));
+
+    return result;
 }
 
 int partial_send(mic_tcp_payload buff)
 {
-    count ++;  
-    
-    if(range == 0)
-    {
-        jump = 1000.0 /((float) loss_rate);
-        range += jump;
+    struct sockaddr_in remote_addr;
+    int random = rand();
+    int result = buff.size;
+    int lr_tresh = (int) round(loss_rate*RAND_MAX);
+
+    if(random > lr_thresh) {
+        result = sendto(sys_socket, buff.data, buff.size, 0, (struct sockaddr *)&remote_addr, sizeof(struct sockaddr));
     }
-    
-    
-    if(((int)range) == count)
-    {
-        reverse = -reverse;        
-        jump = 1000.0 /((float) loss_rate);
-        range += jump + ( (jump / 4) * reverse);
-        printf("\n  --  Lost\n");
-        return buff.size;
-    }   
-    else
-    {
-        return sendto(sys_socket, buff.data, buff.size, 0, (struct sockaddr *)&remote_addr, remote_size);
-    } 
-	
+
+    return result;	
 }
 
 int app_buffer_get(mic_tcp_payload app_buff)
@@ -298,13 +284,13 @@ void* listening(void* arg)
 
 void set_loss_rate(unsigned short rate)
 {
-    loss_rate = rate;
+    loss_rate = ((float) rate) / 100.0;
 }
 
 void print_header(mic_tcp_payload bf)
 {
     mic_tcp_header hd = get_header(bf.data);
-    printf("\nSP: %d, DP: %d, SEQ: %d, ACK: %d, Count: %d, Size: %d.", hd.source_port, hd.dest_port, hd.seq_num, hd.ack_num, app_buffer_count, app_buffer_size);
+    printf("\nSP: %d, DP: %d, SEQ: %d, ACK: %d", hd.source_port, hd.dest_port, hd.seq_num, hd.ack_num);
 }
 
 unsigned long get_now_time_msec()

@@ -22,6 +22,10 @@ unsigned long get_now_time_usec();
 /**********************************************************************
  * Private core functions, should not be used for implementing mictcp *
  **********************************************************************/
+
+#define API_CS_Port 8524
+#define API_SC_Port 8525
+
 int full_send(mic_tcp_payload);
 int partial_send(mic_tcp_payload);
 mic_tcp_payload get_full_stream(mic_tcp_pdu);
