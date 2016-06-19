@@ -25,7 +25,7 @@ vpath %.c $(SRC_DIR)
 
 define make-goal
 $1/%.o: %.c
-	$(CC) -m32 -g -I $(INCLUDES) -c $$< -o $$@
+	$(CC) -ansi -Wall -m32 -g -I $(INCLUDES) -c $$< -o $$@
 endef
 
 .PHONY: all checkdirs clean

@@ -8,6 +8,7 @@ int main()
 {
     
     int sockfd = 0;
+    char chaine[MAX_SIZE]; 
     mic_tcp_sock_addr addr;
     addr.ip_addr = "127.0.0.1";
     addr.port = 1234;
@@ -32,7 +33,6 @@ int main()
         printf("[TSOCK] Connexion du socket MICTCP: OK\n");
     }
     
-    char chaine[MAX_SIZE]; 
     memset(chaine, 0, MAX_SIZE);
 
     printf("[TSOCK] Entrez vos message a envoyer, CTRL+D pour quitter\n");

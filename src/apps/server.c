@@ -7,10 +7,12 @@ int main()
 {
     int sockfd;
     mic_tcp_sock_addr addr;
+    mic_tcp_sock_addr remote_addr;
+    char chaine[MAX_SIZE]; 
+
     addr.ip_addr = "127.0.0.1";
     addr.port = 1234;
 
-    mic_tcp_sock_addr remote_addr;
  
     if ((sockfd = mic_tcp_socket(SERVER)) == -1)
     {
@@ -43,14 +45,14 @@ int main()
     }
  
 
-    char chaine[MAX_SIZE]; 
     memset(chaine, 0, MAX_SIZE);
 
     printf("[TSOCK] Appuyez sur CTRL+C pour quitter ...\n");
 
     while(1) {
+        int rcv_size = 0;
         printf("[TSOCK] Attente d'une donnee, appel de mic_recv ...\n");
-        int rcv_size = mic_tcp_recv(sockfd, chaine, MAX_SIZE);
+        rcv_size = mic_tcp_recv(sockfd, chaine, MAX_SIZE);
         printf("[TSOCK] Reception d'un message de taille : %d\n", rcv_size);
         printf("[TSOCK] Message Recu : %s", chaine);
     }   
