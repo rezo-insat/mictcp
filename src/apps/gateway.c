@@ -53,7 +53,7 @@ void udp_to_tcp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to, in
 
      /* Main activity loop, we never exit this, user terminates with SIGKILL */
      while(1) {
-          bzero(buffer,MAX_UDP_SEGMENT_SIZE);
+          memset(buffer, 0, MAX_UDP_SEGMENT_SIZE);
 
           n = recvfrom(listen_sockfd, buffer, MAX_UDP_SEGMENT_SIZE, 0, (struct sockaddr *) &cliaddr, &len);
           if (n < 0) {
@@ -135,7 +135,7 @@ void file_to_tcp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to, i
 
      /* Main activity loop, we never exit this, user terminates with SIGKILL */
      while(!feof(fd)) {
-          bzero(buffer,MAX_UDP_SEGMENT_SIZE);
+          memset(buffer, 0, MAX_UDP_SEGMENT_SIZE);
 
           n = fread(&currentTime, 1, sizeof(struct timespec), fd);
 	  if(firstValue > 0) {
@@ -218,7 +218,7 @@ void file_to_mictcp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to
     
      /* Main activity loop, we exit this at the end of the file */
      while(active) {
-          bzero(buffer, MAX_UDP_SEGMENT_SIZE);
+          memset(buffer, 0, MAX_UDP_SEGMENT_SIZE);
 
 	  n = fread(&currentTimeFile, 1, sizeof(struct timespec), fd);
 	  if(firstValue > 0) {
@@ -311,7 +311,7 @@ void udp_to_mictcp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to)
 
      /* Main activity loop, we never exit this, user terminates with SIGKILL */
      while(1) {
-          bzero(buffer, MAX_UDP_SEGMENT_SIZE);
+          memset(buffer, 0, MAX_UDP_SEGMENT_SIZE);
 
           n = recvfrom(listen_sockfd, buffer, MAX_UDP_SEGMENT_SIZE, 0, (struct sockaddr *) &cliaddr, &len);
           if (n < 0) {
@@ -383,7 +383,7 @@ void mictcp_to_udp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to)
          int k;
          for(k=0; k<CUMULATED_BUFF_NB; k++) 
          {
-            bzero(Buff[k], MAX_UDP_SEGMENT_SIZE);
+            memset(Buff[k], 0, MAX_UDP_SEGMENT_SIZE);
          }
          
          for(k=0; k<CUMULATED_BUFF_NB; k++) 
@@ -429,17 +429,18 @@ int main(int argc, char ** argv) {
      /* What sockaddr should this program listen on? */
      /* Always on port 1234 (data from VLC arrives there using UDP) */
      struct sockaddr_in serv_addr;
-     bzero((char *) &serv_addr, sizeof(serv_addr));
+     memset((char *) &serv_addr, 0, sizeof(serv_addr));
      serv_addr.sin_family = AF_INET;
      serv_addr.sin_addr.s_addr = INADDR_ANY;
      serv_addr.sin_port = htons(1234);
 
      /* Where should this program send the received data? */
      struct sockaddr_in dest_addr;
-     bzero((char *) &dest_addr, sizeof(dest_addr));
+     memset((char *) &dest_addr, 0, sizeof(dest_addr));
+
      dest_addr.sin_family = AF_INET;
      struct hostent * hp = gethostbyname("127.0.0.1");
-     bcopy ( hp->h_addr, &(dest_addr.sin_addr.s_addr), hp->h_length);
+     memcpy (&(dest_addr.sin_addr.s_addr), hp->h_addr, hp->h_length);
      dest_addr.sin_port = htons(1234);
 
      extern int optind;
@@ -488,7 +489,7 @@ int main(int argc, char ** argv) {
 
      if(puits == 0) {
           hp = gethostbyname(argv[0]);
-          bcopy ( hp->h_addr, &(dest_addr.sin_addr.s_addr), hp->h_length);
+          memcpy (&(dest_addr.sin_addr.s_addr), hp->h_addr, hp->h_length);
           dest_addr.sin_port = htons(atoi(argv[1]));
      } else {
           serv_addr.sin_port = htons(atoi(argv[0]));

@@ -1,4 +1,6 @@
 #include <api/mictcp_core.h>
+#include <sys/time.h>
+#include <time.h>
 #include <pthread.h>
 #include <strings.h>
 
@@ -59,7 +61,7 @@ int initialize_components(start_mode mode)
             remote_addr.sin_family = AF_INET;
             remote_addr.sin_port = htons(API_SC_Port);
             hp = gethostbyname("localhost");
-            bcopy ( hp->h_addr, &(remote_addr.sin_addr.s_addr), hp->h_length);
+            memcpy (&(remote_addr.sin_addr.s_addr), hp->h_addr, hp->h_length);
             remote_size = sizeof(remote_addr);
             initialized = 1;
         } 
@@ -74,7 +76,7 @@ int initialize_components(start_mode mode)
             remote_addr.sin_family = AF_INET;
             remote_addr.sin_port = htons(API_CS_Port);
             hp = gethostbyname("localhost");
-            bcopy ( hp->h_addr, &(remote_addr.sin_addr.s_addr), hp->h_length);
+            memcpy (&(remote_addr.sin_addr.s_addr), hp->h_addr, hp->h_length);
             remote_size = sizeof(remote_addr);
             
             memset((char *) &local_addr, 0, sizeof(local_addr));
@@ -320,9 +322,9 @@ unsigned long get_now_time_msec()
 
 unsigned long get_now_time_usec()
 {
-    struct timeval now_time;
-    gettimeofday(&now_time, NULL);
-    return ((unsigned long)(now_time.tv_usec +(now_time.tv_sec * 1000000)));
+    struct timespec now_time;
+    clock_gettime( CLOCK_REALTIME, &now_time);
+    return ((unsigned long)((now_time.tv_nsec / 1000) + (now_time.tv_sec * 1000000)));
 }
 
 int min_size(int s1, int s2)
