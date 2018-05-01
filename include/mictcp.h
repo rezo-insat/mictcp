@@ -10,28 +10,28 @@
 #include <netinet/in.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <netdb.h> 
+#include <netdb.h>
 #include <pthread.h>
 #include <sys/time.h>
 
 
-/* 
- * Etats du protocole (les noms des états sont donnés à titre indicatif 
+/*
+ * Etats du protocole (les noms des états sont donnés à titre indicatif
  * et peuvent être modifiés)
  */
 typedef enum protocol_state
 {
-    IDLE, CLOSED, SYN_SENT, SYN_RECEIVED, ESTABLISHED, CLOSING  
+    IDLE, CLOSED, SYN_SENT, SYN_RECEIVED, ESTABLISHED, CLOSING
 } protocol_state;
 
 /*
- * Mode de démarrage du protocole 
+ * Mode de démarrage du protocole
  * NB : nécessaire à l’usage de la fonction initialize_components()
  */
 typedef enum start_mode { CLIENT, SERVER } start_mode;
 
 /*
- * Structure d’une adresse de socket 
+ * Structure d’une adresse de socket
  */
 typedef struct mic_tcp_sock_addr
 {
@@ -42,10 +42,10 @@ typedef struct mic_tcp_sock_addr
 
 /*
  * Structure d'un socket
- */ 
+ */
 typedef struct mic_tcp_sock
 {
-  int fd;  /* descripteur du socket */   
+  int fd;  /* descripteur du socket */
   protocol_state state; /* état du protocole */
   mic_tcp_sock_addr addr; /* adresse du socket */
 } mic_tcp_sock;
@@ -74,7 +74,7 @@ typedef struct mic_tcp_header
 } mic_tcp_header;
 
 /*
- * Structure d'un PDU MIC-TCP 
+ * Structure d'un PDU MIC-TCP
  */
 typedef struct mic_tcp_pdu
 {
@@ -83,7 +83,7 @@ typedef struct mic_tcp_pdu
 } mic_tcp_pdu;
 
 /*
- * Structure des données utiles d’un PDU IP 
+ * Structure des données utiles d’un PDU IP
  */
 typedef struct ip_payload
 {
@@ -95,7 +95,7 @@ typedef struct ip_payload
 typedef struct app_buffer
 {
     mic_tcp_payload packet;
-    struct app_buffer* next;  
+    struct app_buffer* next;
     unsigned short id;
 } app_buffer;
 
@@ -103,7 +103,7 @@ typedef struct app_buffer
 /****************************
  * Fonctions de l'interface *
  ****************************/
-int mic_tcp_socket(start_mode sm); 
+int mic_tcp_socket(start_mode sm);
 int mic_tcp_bind(int socket, mic_tcp_sock_addr addr);
 int mic_tcp_accept(int socket, mic_tcp_sock_addr* addr);
 int mic_tcp_connect(int socket, mic_tcp_sock_addr addr);

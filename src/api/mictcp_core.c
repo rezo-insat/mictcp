@@ -36,12 +36,12 @@ int initialize_components(start_mode mode)
     struct hostent * hp;
     struct sockaddr_in local_addr;
 
-    if(initialized != -1) return initialized;    
+    if(initialized != -1) return initialized;
     if((sys_socket = socket(AF_INET, SOCK_DGRAM, 0)) == -1) return -1;
     else initialized = 1;
-    
+
     if((mode == SERVER) & (initialized != -1))
-    {        
+    {
         TAILQ_INIT(&app_buffer_head);
         pthread_cond_init(&buffer_empty_cond, 0);
         memset((char *) &local_addr, 0, sizeof(local_addr));
@@ -49,7 +49,7 @@ int initialize_components(start_mode mode)
         local_addr.sin_port = htons(API_CS_Port);
         local_addr.sin_addr.s_addr = htonl(INADDR_ANY);
         bnd = bind(sys_socket, (struct sockaddr *) &local_addr, sizeof(local_addr));
-         
+
         if (bnd == -1)
         {
             initialized = -1;
@@ -62,9 +62,9 @@ int initialize_components(start_mode mode)
             hp = gethostbyname("localhost");
             memcpy (&(remote_addr.sin_addr.s_addr), hp->h_addr, hp->h_length);
             initialized = 1;
-        } 
-        
-        
+        }
+
+
     }
     else
     {
@@ -75,7 +75,7 @@ int initialize_components(start_mode mode)
             remote_addr.sin_port = htons(API_CS_Port);
             hp = gethostbyname("localhost");
             memcpy (&(remote_addr.sin_addr.s_addr), hp->h_addr, hp->h_length);
-            
+
             memset((char *) &local_addr, 0, sizeof(local_addr));
             local_addr.sin_family = AF_INET;
             local_addr.sin_port = htons(API_SC_Port);
@@ -83,15 +83,15 @@ int initialize_components(start_mode mode)
             bnd = bind(sys_socket, (struct sockaddr *) &local_addr, sizeof(local_addr));
         }
     }
-    
+
     if((initialized == 1) && (mode == SERVER))
     {
         pthread_create (&listen_th, NULL, listening, "1");
     }
-    
+
     return initialized;
 }
-    
+
 
 
 int IP_send(mic_tcp_pdu pk, mic_tcp_sock_addr addr)
@@ -103,12 +103,12 @@ int IP_send(mic_tcp_pdu pk, mic_tcp_sock_addr addr)
         result = -1;
 
     } else {
-        mic_tcp_payload tmp = get_full_stream(pk);        
+        mic_tcp_payload tmp = get_full_stream(pk);
         int sent_size =  mic_tcp_core_send(tmp);
-        
+
         free (tmp.data);
-        
-        result = sent_size;             
+
+        result = sent_size;
     }
 
     return result;
@@ -126,12 +126,12 @@ int IP_recv(ip_payload* pk,mic_tcp_sock_addr* addr, unsigned long timeout)
     if(initialized == -1) {
         return -1;
     }
-   
+
     /* Compute the number of entire seconds */
-    tv.tv_sec = timeout / 1000; 
+    tv.tv_sec = timeout / 1000;
     /* Convert the remainder to microseconds */
-    tv.tv_usec = (timeout - tv.tv_sec * 1000) * 1000;    
-    
+    tv.tv_usec = (timeout - tv.tv_sec * 1000) * 1000;
+
     if ((setsockopt(sys_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv))) >= 0) {
        result = recvfrom(sys_socket, pk->data, pk->size, 0, (struct sockaddr *)&tmp_addr, &tmp_addr_size);
        pk->size = result;
@@ -146,10 +146,10 @@ mic_tcp_payload get_full_stream(mic_tcp_pdu pk)
     mic_tcp_payload tmp;
     tmp.size = API_HD_Size + pk.payload.size;
     tmp.data = malloc (tmp.size);
-    
+
     memcpy (tmp.data, &pk.header, API_HD_Size);
     memcpy (tmp.data + API_HD_Size, pk.payload.data, pk.payload.size);
-    
+
     return tmp;
 }
 
@@ -161,7 +161,7 @@ mic_tcp_payload get_mic_tcp_data(ip_payload buff)
     memcpy(tmp.data, buff.data+API_HD_Size, tmp.size);
     return tmp;
 }
-    
+
 
 mic_tcp_header get_mic_tcp_header(ip_payload packet)
 {
@@ -192,7 +192,7 @@ int mic_tcp_core_send(mic_tcp_payload buff)
         printf("[MICTCP-CORE] Perte du paquet\n");
     }
 
-    return result;	
+    return result;
 }
 
 int app_buffer_get(mic_tcp_payload app_buff)
@@ -218,23 +218,23 @@ int app_buffer_get(mic_tcp_payload app_buff)
 
     /* The entry we want is the first one in the buffer */
     entry = app_buffer_head.tqh_first;
-   
+
     /* How much data are we going to deliver to the application ? */
     result = min_size(entry->bf.size, app_buff.size);
 
     /* We copy the actual data in the application allocated buffer */
     memcpy(app_buff.data, entry->bf.data, result);
 
-    /* We remove the entry from the buffer */ 
+    /* We remove the entry from the buffer */
     TAILQ_REMOVE(&app_buffer_head, entry, entries);
-    
-    /* Release the mutex */ 
+
+    /* Release the mutex */
     pthread_mutex_unlock(&lock);
-  
+
     /* Clean up memory */
     free(entry->bf.data);
     free(entry);
- 
+
     return result;
 }
 
@@ -248,11 +248,11 @@ void app_buffer_put(mic_tcp_payload bf)
     pthread_mutex_lock(&lock);
 
     /* Insert the packet in the buffer, at the end of it */
-    TAILQ_INSERT_TAIL(&app_buffer_head, entry, entries);	
-   
+    TAILQ_INSERT_TAIL(&app_buffer_head, entry, entries);
+
     /* Release the mutex */
     pthread_mutex_unlock(&lock);
-    
+
     /* We can now signal to any potential thread waiting that the buffer is
        no longer empty */
     pthread_cond_broadcast(&buffer_empty_cond);
@@ -261,25 +261,25 @@ void app_buffer_put(mic_tcp_payload bf)
 
 
 void* listening(void* arg)
-{   
+{
     mic_tcp_pdu pdu_tmp;
-    int recv_size; 
+    int recv_size;
     mic_tcp_sock_addr remote;
     ip_payload tmp_buff;
-    
+
     pthread_mutex_init(&lock, NULL);
 
     printf("[MICTCP-CORE] Demarrage du thread de reception reseau...\n");
-        
+
     tmp_buff.size = 1500;
     tmp_buff.data = malloc(1500);
-    
-   
+
+
     while(1)
-    {     
+    {
         tmp_buff.size = 1500;
-        recv_size = IP_recv(&tmp_buff, &remote, 0);       
-        
+        recv_size = IP_recv(&tmp_buff, &remote, 0);
+
         if(recv_size > 0)
         {
             pdu_tmp.header = get_mic_tcp_header (tmp_buff);
@@ -289,7 +289,7 @@ void* listening(void* arg)
             /* This should never happen */
             printf("Error in recv\n");
         }
-    }    
+    }
 }
 
 

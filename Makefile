@@ -10,7 +10,7 @@ LD        := gcc
 
 TAR_FILENAME := $(DATE)-mictcp-$(TAG).tar.gz
 
-MODULES   := api apps 
+MODULES   := api apps
 SRC_DIR   := $(addprefix src/,$(MODULES)) src
 BUILD_DIR := $(addprefix build/,$(MODULES)) build
 
@@ -19,7 +19,7 @@ OBJ       := $(patsubst src/%.c,build/%.o,$(SRC))
 OBJ_CLI   := $(patsubst build/apps/gateway.o,,$(patsubst build/apps/server.o,,$(OBJ)))
 OBJ_SERV  := $(patsubst build/apps/gateway.o,,$(patsubst build/apps/client.o,,$(OBJ)))
 OBJ_GWAY  := $(patsubst build/apps/server.o,,$(patsubst build/apps/client.o,,$(OBJ)))
-INCLUDES  := include 
+INCLUDES  := include
 
 vpath %.c $(SRC_DIR)
 
@@ -51,7 +51,7 @@ clean:
 
 distclean:
 	@rm -rf $(BUILD_DIR)
-	@-rm -f *.tar.gz || true 
+	@-rm -f *.tar.gz || true
 
 
 $(foreach bdir,$(BUILD_DIR),$(eval $(call make-goal,$(bdir))))

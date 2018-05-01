@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/types.h> 
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
@@ -29,7 +29,7 @@ void udp_to_tcp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to, in
 
      /* A buffer used to store received segments before they are forwarded */
      char buffer[MAX_UDP_SEGMENT_SIZE];
-     
+
      /* Initialize a packet count variable used when loss emulation is active */
      int count = 0;
      ssize_t n = -1;
@@ -39,7 +39,7 @@ void udp_to_tcp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to, in
      struct sockaddr_in cliaddr;
      socklen_t len = sizeof(cliaddr);
 
-     /* We construct the socket to be used by this function */ 
+     /* We construct the socket to be used by this function */
      listen_sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
      if (bind(listen_sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
@@ -57,7 +57,7 @@ void udp_to_tcp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to, in
 
           n = recvfrom(listen_sockfd, buffer, MAX_UDP_SEGMENT_SIZE, 0, (struct sockaddr *) &cliaddr, &len);
           if (n < 0) {
-               perror(0); 
+               perror(0);
           }
 
           if(loss == 1) {
@@ -73,14 +73,14 @@ void udp_to_tcp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to, in
           n = sendto(listen_sockfd, buffer, n, 0, (struct sockaddr *) &transmit_to, len);
           if (n < 0) {
                perror(0);
-          } 
+          }
      }
 
      /* We never execute this but anyway, for sanity */
      close(listen_sockfd);
-} 
+}
 
-struct timespec tsSubtract (struct  timespec  time1, struct  timespec  time2) {    
+struct timespec tsSubtract (struct  timespec  time1, struct  timespec  time2) {
     struct  timespec  result ;
 
     /* Subtract the second time from the first. */
@@ -149,7 +149,7 @@ void file_to_tcp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to, i
           n = fread(buffer, 1, sizeof(n), fd);
           n = fread(buffer, 1, *((int *)buffer), fd);
           if (n < 0) {
-               perror(0); 
+               perror(0);
           }
 
           if(loss == 1) {
@@ -165,11 +165,11 @@ void file_to_tcp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to, i
           n = sendto(listen_sockfd, buffer, n, 0, (struct sockaddr *) &transmit_to, len);
           if (n < 0) {
                perror(0);
-          } 
+          }
      }
 
      close(listen_sockfd);
-} 
+}
 
 /**
  * Function that reads a file and delivers to MICTCP.
@@ -196,7 +196,7 @@ void file_to_mictcp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to
      int firstValue = 0;
      int active = 1;
 
-    
+
      /* MICTCP stuff */
      int mic_tcp_sockfd;
      start_mode start_mode_mic_tcp = CLIENT;
@@ -206,7 +206,7 @@ void file_to_mictcp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to
 
      /* We construct the UDP and MICTCP sockets to be used by this function */
      listen_sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-     
+
      if((mic_tcp_sockfd = mic_tcp_socket(start_mode_mic_tcp)) == -1) {
           printf("ERROR creating the MICTCP socket\n");
      }
@@ -215,7 +215,7 @@ void file_to_mictcp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to
      if(mic_tcp_connect(mic_tcp_sockfd, mic_tcp_dest_addr) == -1) {
           printf("ERROR connecting the MICTCP socket\n");
      }
-    
+
      /* Main activity loop, we exit this at the end of the file */
      while(active) {
           memset(buffer, 0, MAX_UDP_SEGMENT_SIZE);
@@ -247,18 +247,18 @@ void file_to_mictcp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to
           }
 
           /* We forward the packet to its final destination */
-          n = mic_tcp_send(mic_tcp_sockfd, buffer, n); 
+          n = mic_tcp_send(mic_tcp_sockfd, buffer, n);
           if (n <= 0) {
                printf("ERROR on MICTCP send\n");
-          } 
+          }
      }
 
      /* We execute this when the file has finished being replayed */
      close(listen_sockfd);
-      
+
      /* Same for MICTCP */
      mic_tcp_close(mic_tcp_sockfd);
-} 
+}
 
 
 
@@ -278,10 +278,10 @@ void udp_to_mictcp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to)
      struct sockaddr_in cliaddr;
      struct sockaddr_in serv_addr = listen_on;
      socklen_t len = sizeof(cliaddr);
- 
+
      /* Initialize a packet count variable used when loss emulation is active */
      ssize_t n = -1;
-    
+
      /* MICTCP stuff */
      int mic_tcp_sockfd;
      start_mode start_mode_mic_tcp = CLIENT;
@@ -291,7 +291,7 @@ void udp_to_mictcp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to)
 
      /* We construct the UDP and MICTCP sockets to be used by this function */
      listen_sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-     
+
      if((mic_tcp_sockfd = mic_tcp_socket(start_mode_mic_tcp)) == -1) {
           printf("ERROR creating the MICTCP socket\n");
      }
@@ -300,7 +300,7 @@ void udp_to_mictcp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to)
      if(mic_tcp_connect(mic_tcp_sockfd, mic_tcp_dest_addr) == -1) {
           printf("ERROR connecting the MICTCP socket\n");
      }
-     
+
      if (bind(listen_sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
           printf("ERROR on binding the UDP socket: ");
           perror(0);
@@ -315,22 +315,22 @@ void udp_to_mictcp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to)
 
           n = recvfrom(listen_sockfd, buffer, MAX_UDP_SEGMENT_SIZE, 0, (struct sockaddr *) &cliaddr, &len);
           if (n < 0) {
-               perror(0); 
+               perror(0);
           }
 
           /* We forward the packet to its final destination */
-          n = mic_tcp_send(mic_tcp_sockfd, buffer, n); 
+          n = mic_tcp_send(mic_tcp_sockfd, buffer, n);
           if (n <= 0) {
                printf("ERROR on MICTCP send\n");
-          } 
+          }
      }
 
      /* We never execute this but anyway, for sanity */
      close(listen_sockfd);
-      
+
      /* Same for MICTCP */
      mic_tcp_close(mic_tcp_sockfd);
-} 
+}
 
 /**
  * Function that listens on MICTCP and delivers to UDP.
@@ -352,7 +352,7 @@ void mictcp_to_udp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to)
      /* Addresses for the work to be performed */
      struct sockaddr_in cliaddr;
      socklen_t len = sizeof(cliaddr);
-     
+
      /* MICTCP stuff */
      int mic_tcp_sockfd;
      start_mode start_mode_mic_tcp = SERVER;
@@ -362,7 +362,7 @@ void mictcp_to_udp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to)
 
      /* We construct the UDP and MICTCP sockets to be used by this function */
      sending_sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-     
+
      if((mic_tcp_sockfd = mic_tcp_socket(start_mode_mic_tcp)) == -1) {
           printf("ERROR creating the MICTCP socket\n");
      }
@@ -381,12 +381,12 @@ void mictcp_to_udp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to)
      /* Main activity loop, we never exit this, user terminates with SIGKILL */
      while(1) {
          int k;
-         for(k=0; k<CUMULATED_BUFF_NB; k++) 
+         for(k=0; k<CUMULATED_BUFF_NB; k++)
          {
             memset(Buff[k], 0, MAX_UDP_SEGMENT_SIZE);
          }
-         
-         for(k=0; k<CUMULATED_BUFF_NB; k++) 
+
+         for(k=0; k<CUMULATED_BUFF_NB; k++)
          {
               n = mic_tcp_recv(mic_tcp_sockfd, Buff[k], MAX_UDP_SEGMENT_SIZE);
               if (n <= 0) {
@@ -395,23 +395,23 @@ void mictcp_to_udp(struct sockaddr_in listen_on, struct sockaddr_in transmit_to)
          }
 
          /* We forward the packet to its final destination */
-         for(k=0; k<CUMULATED_BUFF_NB; k++) 
+         for(k=0; k<CUMULATED_BUFF_NB; k++)
          {
               n = sendto(sending_sockfd, Buff[k], n, 0, (struct sockaddr *) &transmit_to, len);
               if (n <= 0) {
                    perror(0);
-              } 
+              }
          }
-         
+
          /*sleep(1); */
      }
 
      /* We never execute this but anyway, for sanity */
      close(sending_sockfd);
-      
+
      /* Same for MICTCP */
      mic_tcp_close(mic_tcp_sockfd);
-} 
+}
 
 
 static void usage(void) {
@@ -455,18 +455,18 @@ int main(int argc, char ** argv) {
                          transport = 0;
                     } else {
                          printf("Unrecognized transport : %s\n", optarg);
-                    } 
+                    }
                     break;
                 case 's':
                     if(puits == -1) {
-                         puits = 0; 
+                         puits = 0;
                     } else {
                          puits = -2;
                     }
                     break;
                 case 'p':
                     if(puits == -1) {
-                         puits = 1; 
+                         puits = 1;
                     } else {
                          puits = -2;
                     }
@@ -481,7 +481,7 @@ int main(int argc, char ** argv) {
      }
      argc -= optind;
      argv += optind;
-    
+
      if((puits == 1 && argc != 1) || ((puits == 0) && argc != 2)) {
           usage();
           return -1;

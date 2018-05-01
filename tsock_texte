@@ -6,13 +6,13 @@ protocol="tcp"
 
 usage() { echo "Usage: $0 [-p|-s]" 1>&2; exit 1; }
 
-while getopts "pst:" o; do 
+while getopts "pst:" o; do
 	case "${o}" in
 	        p)
-	                puits=true 
+	                puits=true
 	                ;;
 	        s)
-	                sourc=true 
+	                sourc=true
 	                ;;
 	        *)
 		        usage
@@ -27,7 +27,7 @@ fi
 
 if [ "$puits" = true ]; then
     cd build
-    ./server 
+    ./server
     cd ..
 fi
 

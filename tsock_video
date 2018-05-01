@@ -6,20 +6,20 @@ protocol="tcp"
 
 usage() { echo "Usage: $0 [[-p|-s] [-t (tcp|mictcp)]" 1>&2; exit 1; }
 
-while getopts "pst:" o; do 
+while getopts "pst:" o; do
 	case "${o}" in
 		t)
 	         	protocol=${OPTARG}
-			if [ "$protocol" != "tcp" ] && [ "$protocol" != "mictcp" ]; then 
+			if [ "$protocol" != "tcp" ] && [ "$protocol" != "mictcp" ]; then
 				usage
 				exit 1
 			fi
 			;;
 	        p)
-	                puits=true 
+	                puits=true
 	                ;;
 	        s)
-	                sourc=true 
+	                sourc=true
 	                ;;
 	        *)
 		        usage
@@ -53,7 +53,7 @@ if [ "$sourc" = true ]; then
 fi
 
 echo "Appuyez sur ENTREE pour arreter"
-read line 
+read line
 
 echo "Arret"
 killall -9 cvlc > /dev/null 2>&1
