@@ -25,7 +25,7 @@ vpath %.c $(SRC_DIR)
 
 define make-goal
 $1/%.o: %.c
-	$(CC) -ansi -Wall -m32 -g -I $(INCLUDES) -c $$< -o $$@
+	$(CC) -std=gnu99 -Wall -m32 -g -I $(INCLUDES) -c $$< -o $$@
 endef
 
 .PHONY: all checkdirs clean
@@ -33,13 +33,13 @@ endef
 all: checkdirs build/client build/server build/gateway
 
 build/client: $(OBJ_CLI)
-	$(LD) -m32 $^ -o $@ -lpthread 
+	$(LD) -m32 $^ -o $@ -lm -lpthread
 
 build/server: $(OBJ_SERV)
-	$(LD) -m32 $^ -o $@ -lpthread 
+	$(LD) -m32 $^ -o $@ -lm -lpthread
 
 build/gateway: $(OBJ_GWAY)
-	$(LD) -m32 $^ -o $@ -lpthread 
+	$(LD) -m32 $^ -o $@ -lm -lpthread
 
 checkdirs: $(BUILD_DIR)
 

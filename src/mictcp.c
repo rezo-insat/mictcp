@@ -7,9 +7,12 @@
  */
 int mic_tcp_socket(start_mode sm) 
 {
+   int result = -1;
    printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
-   initialize_components(sm); /* Appel obligatoire */
-   return -1;
+   result = initialize_components(sm); /* Appel obligatoire */
+   set_loss_rate(0);
+
+   return result;
 }
 
 /*
@@ -45,7 +48,6 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
 /*
  * Permet de réclamer l’envoi d’une donnée applicative
  * Retourne la taille des données envoyées, et -1 en cas d'erreur
- * Dans le cas de la vidéo, seul la source va envoyer au puits
  */
 int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
 {
@@ -62,7 +64,7 @@ int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
 int mic_tcp_recv (int socket, char* mesg, int max_mesg_size)
 {
     printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
-    return -1;
+    return -1; 
 }
 
 /*
@@ -80,7 +82,7 @@ int mic_tcp_close (int socket)
  * Traitement d’un PDU MIC-TCP reçu (mise à jour des numéros de séquence
  * et d'acquittement, etc.) puis insère les données utiles du PDU dans 
  * le buffer de réception du socket. Cette fonction utilise la fonction 
- * app_buffer_add().   
+ * app_buffer_put().   
  */
 void process_received_PDU(mic_tcp_pdu pdu)
 {

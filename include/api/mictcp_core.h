@@ -11,9 +11,9 @@
 int initialize_components(start_mode sm);
 
 int IP_send(mic_tcp_pdu, mic_tcp_sock_addr);
-int IP_recv(mic_tcp_payload*, mic_tcp_sock_addr*, unsigned long delay);
+int IP_recv(ip_payload*, mic_tcp_sock_addr*, unsigned long timeout);
 int app_buffer_get(mic_tcp_payload);
-void app_buffer_set(mic_tcp_payload);
+void app_buffer_put(mic_tcp_payload);
 
 void set_loss_rate(unsigned short);
 unsigned long get_now_time_msec();
@@ -25,14 +25,14 @@ unsigned long get_now_time_usec();
 
 #define API_CS_Port 8524
 #define API_SC_Port 8525
+#define API_HD_Size 15
 
-int full_send(mic_tcp_payload);
-int partial_send(mic_tcp_payload);
+int mic_tcp_core_send(mic_tcp_payload);
 mic_tcp_payload get_full_stream(mic_tcp_pdu);
-mic_tcp_payload get_data_stream(mic_tcp_payload);
-mic_tcp_header get_header(char*);
+mic_tcp_payload get_mic_tcp_data(ip_payload);
+mic_tcp_header get_mic_tcp_header(ip_payload);
 void* listening(void*);
-void print_header(mic_tcp_payload);
+void print_header(mic_tcp_pdu);
 
 int min_size(int, int);
 float mod(int, float);

@@ -82,6 +82,16 @@ typedef struct mic_tcp_pdu
   mic_tcp_payload payload; /* charge utile du PDU */
 } mic_tcp_pdu;
 
+/*
+ * Structure des données utiles d’un PDU IP 
+ */
+typedef struct ip_payload
+{
+  char* data; /* données transport */
+  int size; /* taille des données */
+} ip_payload;
+
+
 typedef struct app_buffer
 {
     mic_tcp_payload packet;
@@ -101,24 +111,5 @@ int mic_tcp_send (int socket, char* mesg, int mesg_size);
 int mic_tcp_recv (int socket, char* mesg, int max_mesg_size);
 void process_received_PDU(mic_tcp_pdu pdu);
 int mic_tcp_close(int socket);
-
-/**********************
- * Variables globales *
- **********************/
-mic_tcp_sock local_sock_src;
-mic_tcp_sock local_sock_dest;
-unsigned long timer;
-unsigned long RTT1;
-unsigned long RTT2;
-int PE;
-int PA;
-float pourcentage_perte_client;
-float pourcentage_perte_serveur;
-float compteurDT;
-float DTperdu;
-mic_tcp_pdu DT;
-mic_tcp_pdu Syn;
-mic_tcp_pdu Ack;
-mic_tcp_pdu Syn_Ack;
 
 #endif
