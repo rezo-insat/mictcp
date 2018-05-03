@@ -108,13 +108,14 @@ int IP_send(mic_tcp_pdu pk, mic_tcp_sock_addr addr)
 
         free (tmp.data);
 
-        result = sent_size;
+        /* Correct the sent size */
+        result = (sent_size == -1) ? -1 : sent_size - API_HD_Size;
     }
 
     return result;
 }
 
-int IP_recv(ip_payload* pk,mic_tcp_sock_addr* addr, unsigned long timeout)
+int IP_recv(mic_tcp_pdu* pk, mic_tcp_sock_addr* addr, unsigned long timeout)
 {
     int result = -1;
 
@@ -132,10 +133,33 @@ int IP_recv(ip_payload* pk,mic_tcp_sock_addr* addr, unsigned long timeout)
     /* Convert the remainder to microseconds */
     tv.tv_usec = (timeout - tv.tv_sec * 1000) * 1000;
 
+    /* Create a reception buffer */
+    int buffer_size = API_HD_Size + pk->payload.size;
+    char *buffer = malloc(buffer_size);
+
     if ((setsockopt(sys_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv))) >= 0) {
-       result = recvfrom(sys_socket, pk->data, pk->size, 0, (struct sockaddr *)&tmp_addr, &tmp_addr_size);
-       pk->size = result;
+       result = recvfrom(sys_socket, buffer, buffer_size, 0, (struct sockaddr *)&tmp_addr, &tmp_addr_size);
     }
+
+    if (result != -1) {
+        /* Create the mic_tcp_pdu */
+        memcpy (&(pk->header), buffer, API_HD_Size);
+        pk->payload.size = result - API_HD_Size;
+        memcpy (pk->payload.data, buffer + API_HD_Size, pk->payload.size);
+
+        /* Generate a stub address */
+        if (addr != NULL) {
+            addr->ip_addr = "localhost";
+            addr->ip_addr_size = strlen(addr->ip_addr) + 1; // don't forget '\0'
+            addr->port = pk->header.source_port;
+        }
+
+        /* Correct the receved size */
+        result -= API_HD_Size;
+    }
+
+    /* Free the reception buffer */
+    free(buffer);
 
     return result;
 }
@@ -242,7 +266,9 @@ void app_buffer_put(mic_tcp_payload bf)
 {
     /* Prepare a buffer entry to store the data */
     struct app_buffer_entry * entry = malloc(sizeof(struct app_buffer_entry));
-    entry->bf = bf;
+    entry->bf.size = bf.size;
+    entry->bf.data = malloc(bf.size);
+    memcpy(entry->bf.data, bf.data, bf.size);
 
     /* Lock a mutex to protect the buffer from corruption */
     pthread_mutex_lock(&lock);
@@ -265,26 +291,24 @@ void* listening(void* arg)
     mic_tcp_pdu pdu_tmp;
     int recv_size;
     mic_tcp_sock_addr remote;
-    ip_payload tmp_buff;
 
     pthread_mutex_init(&lock, NULL);
 
     printf("[MICTCP-CORE] Demarrage du thread de reception reseau...\n");
 
-    tmp_buff.size = 1500;
-    tmp_buff.data = malloc(1500);
+    const int payload_size = 1500 - API_HD_Size;
+    pdu_tmp.payload.size = payload_size;
+    pdu_tmp.payload.data = malloc(payload_size);
 
 
     while(1)
     {
-        tmp_buff.size = 1500;
-        recv_size = IP_recv(&tmp_buff, &remote, 0);
+        pdu_tmp.payload.size = payload_size;
+        recv_size = IP_recv(&pdu_tmp, &remote, 0);
 
-        if(recv_size > 0)
+        if(recv_size != -1)
         {
-            pdu_tmp.header = get_mic_tcp_header (tmp_buff);
-            pdu_tmp.payload = get_mic_tcp_data (tmp_buff);
-            process_received_PDU(pdu_tmp);
+            process_received_PDU(pdu_tmp, remote);
         } else {
             /* This should never happen */
             printf("Error in recv\n");

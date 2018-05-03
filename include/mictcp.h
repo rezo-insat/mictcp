@@ -82,16 +82,6 @@ typedef struct mic_tcp_pdu
   mic_tcp_payload payload; /* charge utile du PDU */
 } mic_tcp_pdu;
 
-/*
- * Structure des données utiles d’un PDU IP
- */
-typedef struct ip_payload
-{
-  char* data; /* données transport */
-  int size; /* taille des données */
-} ip_payload;
-
-
 typedef struct app_buffer
 {
     mic_tcp_payload packet;
@@ -109,7 +99,7 @@ int mic_tcp_accept(int socket, mic_tcp_sock_addr* addr);
 int mic_tcp_connect(int socket, mic_tcp_sock_addr addr);
 int mic_tcp_send (int socket, char* mesg, int mesg_size);
 int mic_tcp_recv (int socket, char* mesg, int max_mesg_size);
-void process_received_PDU(mic_tcp_pdu pdu);
+void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr);
 int mic_tcp_close(int socket);
 
 #endif
