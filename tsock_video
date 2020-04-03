@@ -3,6 +3,7 @@
 puits=false
 sourc=false
 protocol="tcp"
+port=`expr \`id -u\` % 3000 + 14578`
 
 usage() { echo "Usage: $0 [[-p|-s] [-t (tcp|mictcp)]" 1>&2; exit 1; }
 
@@ -35,11 +36,11 @@ fi
 if [ "$puits" = true ]; then
 
     echo "Lancement du puits, protocole " $protocol
-    cvlc rtp://127.0.0.1:1234 > /dev/null 2>&1 &
+    cvlc rtp://127.0.0.1:$port > /dev/null 2>&1 &
 
     if [ "$protocol" = "mictcp" ]; then
         cd build
-        ./gateway -p -t $protocol 1234 &
+        ./gateway -p -t $protocol $port &
     cd ..
     fi
 fi
@@ -48,7 +49,7 @@ if [ "$sourc" = true ]; then
 
     echo "Lancement de la source, protocol " $protocol
     cd build
-    ./gateway -s -t $protocol 127.0.0.1 1234 &
+    ./gateway -s -t $protocol 127.0.0.1 $port &
     cd ..
 fi
 

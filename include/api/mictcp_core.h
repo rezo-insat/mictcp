@@ -22,9 +22,12 @@ unsigned long get_now_time_usec();
 /**********************************************************************
  * Private core functions, should not be used for implementing mictcp *
  **********************************************************************/
-
-#define API_CS_Port 8524
-#define API_SC_Port 8525
+#ifndef API_CS_Port
+  #define API_CS_Port 8524
+#endif
+#ifndef API_SC_Port
+  #define API_SC_Port 8525
+#endif
 #define API_HD_Size 15
 
 typedef struct ip_payload
