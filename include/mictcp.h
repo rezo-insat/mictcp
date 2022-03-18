@@ -21,7 +21,7 @@
  */
 typedef enum protocol_state
 {
-    IDLE, CLOSED, SYN_SENT, SYN_RECEIVED, ESTABLISHED, CLOSING
+    IDLE, CLOSED, SYN_SENT, SYN_RECEIVED, CONNECTED, CLOSING
 } protocol_state;
 
 /*
