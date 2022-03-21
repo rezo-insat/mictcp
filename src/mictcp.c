@@ -1,6 +1,8 @@
+// V3 avec vrai pourcentage 
+
 #include <mictcp.h>
 #include <api/mictcp_core.h>
-#define TIMEOUT 500
+#define TIMEOUT 100
 
 /*
  * Permet de créer un socket entre l’application et MIC-TCP
@@ -9,8 +11,9 @@
     mic_tcp_sock sock;
     mic_tcp_pdu pdu;
     int PE,PA = 0;
-    int lostpdu = 0;
-    int lostrate = 10; 
+    float lostpdu = 0;
+    float lostrate = 10.0; 
+    float pduemis =1;
     // lost sur 
 int mic_tcp_socket(start_mode sm)
 {
@@ -18,7 +21,7 @@ int mic_tcp_socket(start_mode sm)
    printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
    result = initialize_components(sm); /* Appel obligatoire */
    sock.fd=result;
-   set_loss_rate(10);
+   set_loss_rate(5);
    return result;
 }
 
@@ -95,9 +98,9 @@ int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
     int sent= 0;
     int max = 20;
     int count = 0;
-    printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
 
-    
+    printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
+  
     pdu.header.syn = 0;
     pdu.header.ack = 0;
     pdu.header.fin = 0;
@@ -113,44 +116,53 @@ int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
         exit(1);
     }
     PE = (PE +1) %2;
+    pduemis++; 
     int test = (IP_recv(&pdu,&sock.addr,TIMEOUT) ==-1);
-
-    while(test && count < max){
-        count++; 
-        printf("Count: %d \n", count);  
-        if((sent=IP_send(pdu,sock.addr))==-1){
-            printf("Erreur d'envoi du pdu");
-            exit(1);
-        }
-        test=(IP_recv(&pdu,&sock.addr,TIMEOUT) ==-1);  
-    }
-    if(count == max)
-        exit(-1);
-    count = 0;
     
-    while(pdu.header.ack_num!=PE){
-        count++;
-        if(count == max){break;}
-        printf("Paquet message perdu \n");
-        
-        if((sent=IP_send(pdu,sock.addr))==-1){
-            printf("Erreur d'envoi du pdu");
-            exit(1);
+    if (test){  
+        lostpdu++;
+        printf("Lost Pdu : %f\n",lostpdu);
+    }
+    printf("Lost rate= %f \n",(lostpdu/pduemis)*100.0);
+    
+    if((lostpdu/pduemis)*100 > lostrate && test){
+        while(count < max && test){
+            count++; 
+            printf("Count: %d \n", count);  
+            if((sent=IP_send(pdu,sock.addr))==-1){
+                printf("Erreur d'envoi du pdu");
+                exit(-1);
+            }
+            test=(IP_recv(&pdu,&sock.addr,TIMEOUT) ==-1);  
         }
-        test=(IP_recv(&pdu,&sock.addr,TIMEOUT) ==-1);  
-        while(test){
+        if(count == max)
+            exit(-1);
+        count = 0;
+        while(pdu.header.ack_num!=PE){
             count++;
-            if(count == max){break;}
-            if(IP_send(mem,sock.addr)==-1){
+            if(count == max){exit(-1);}
+            printf("Paquet message perdu \n");
+            
+            if((sent=IP_send(pdu,sock.addr))==-1){
                 printf("Erreur d'envoi du pdu");
                 exit(1);
-                }
-            test=(IP_recv(&pdu,&sock.addr,TIMEOUT) ==-1);
-            
             }
-        printf("Count : %d\n",count);
-        
-    } 
+            test=(IP_recv(&pdu,&sock.addr,TIMEOUT) ==-1);  
+            while(count < max && test){
+                count++;
+                if(count == max){exit(-1);}
+                if(IP_send(mem,sock.addr)==-1){
+                    printf("Erreur d'envoi du pdu");
+                    exit(1);
+                }
+                test=(IP_recv(&pdu,&sock.addr,TIMEOUT) ==-1);
+            }
+            printf("Count : %d\n",count);
+            if(count == max)
+                exit(-1);
+        } 
+    }
+
     return sent;
 }
 
