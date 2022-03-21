@@ -2,7 +2,7 @@
 
 #include <mictcp.h>
 #include <api/mictcp_core.h>
-#define TIMEOUT 100
+#define TIMEOUT 10
 
 /*
  * Permet de créer un socket entre l’application et MIC-TCP
