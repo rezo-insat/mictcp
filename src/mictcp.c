@@ -11,9 +11,9 @@
     mic_tcp_sock sock;
     mic_tcp_pdu pdu;
     int PE,PA = 0;
-    float lostpdu = 0;
-    float lostrate = 10.0; 
-    float pduemis =1;
+    float lostpdu = 0.0;
+    float lostrate = 70.0; 
+    float pduemis =1.0;
     // lost sur 
 int mic_tcp_socket(start_mode sm)
 {
@@ -21,7 +21,7 @@ int mic_tcp_socket(start_mode sm)
    printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
    result = initialize_components(sm); /* Appel obligatoire */
    sock.fd=result;
-   set_loss_rate(5);
+   set_loss_rate(10);
    return result;
 }
 
@@ -125,7 +125,7 @@ int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
     }
     printf("Lost rate= %f \n",(lostpdu/pduemis)*100.0);
     
-    if((lostpdu/pduemis)*100 > lostrate && test){
+    if((lostpdu/pduemis)*100.0 > lostrate && test){
         while(count < max && test){
             count++; 
             printf("Count: %d \n", count);  
