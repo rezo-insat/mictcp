@@ -12,7 +12,7 @@
     mic_tcp_pdu pdu;
     int PE,PA = 0;
     float lostpdu = 0.0;
-    float lostrate = 70.0; 
+    float lostrate = 25.0; 
     float pduemis =1.0;
     // lost sur 
 int mic_tcp_socket(start_mode sm)
@@ -21,7 +21,7 @@ int mic_tcp_socket(start_mode sm)
    printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
    result = initialize_components(sm); /* Appel obligatoire */
    sock.fd=result;
-   set_loss_rate(10);
+   set_loss_rate(5);
    return result;
 }
 
@@ -95,7 +95,7 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
  */
 int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
 {
-    int sent= 0;
+    int sent= -1;
     int max = 20;
     int count = 0;
 
