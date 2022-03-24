@@ -12,8 +12,8 @@
     mic_tcp_pdu pdu;
     int PE,PA = 0;
     float lostpdu = 0.0;
-    float lostrate = 25.0; 
-    float pduemis =1.0;
+    float lostrate = 15.0;
+    float pduemis =0.0;
     // lost sur 
 int mic_tcp_socket(start_mode sm)
 {
@@ -21,7 +21,7 @@ int mic_tcp_socket(start_mode sm)
    printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
    result = initialize_components(sm); /* Appel obligatoire */
    sock.fd=result;
-   set_loss_rate(5);
+   set_loss_rate(25);
    return result;
 }
 
@@ -205,7 +205,7 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr)
     printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
     if(pdu.header.seq_num == PA){
         app_buffer_put(pdu.payload);
-        PA= (PA+1) %2;
+        PA = (PA+1) %2;
     }else{
         printf("Paquet Ack perdu\n");
     }
