@@ -157,7 +157,7 @@ int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
     pdu.payload.size=mesg_size;
 
     mic_tcp_pdu mem = pdu; 
-    printf("%d\n",pdu.header.seq_num);
+    //printf("%d\n",pdu.header.seq_num);
     if((sent=IP_send(pdu,sock.addr))==-1){
         printf("Erreur d'envoi du pdu");
         exit(1);
@@ -258,28 +258,29 @@ int mic_tcp_close (int socket)
 void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr)
 {
     printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
-    sock.state = CONNECTED;
-    if (sock.state == CONNECTED){
-        printf("Paquet recu \n");
-        printf("ACK NUM %d\n",pdu.header.ack);
-        mic_tcp_pdu ack; 
-       
-        if(pdu.header.seq_num == PA){
-            app_buffer_put(pdu.payload);
-            PA = (PA+1) %2;
-        }else{
-            printf("Paquet Ack perdu\n");
-        }
-        printf("avant send\n");
-        ack.header.ack=1;
-        ack.header.ack_num=PA;
-        if (IP_send(ack,addr)==-1)
-        {
-            printf("Erreur d'envoi du pdu");
-            exit(1);
-        }
-        printf("Ack envoyé \n");
+    printf("Paquet recu \n");
+    printf("ACK NUM %d\n",pdu.header.seq_num);
+    mic_tcp_pdu ack; 
+    
+    if(pdu.header.seq_num == PA){
+        app_buffer_put(pdu.payload);
+        PA = (PA+1) %2;
     }else{
+        printf("Paquet Ack perdu\n");
+    }
+    ack.header.ack=1;
+    ack.header.ack_num=PA;
+    ack.payload.data =""; 
+    ack.payload.size=0;
+
+    if (IP_send(ack,addr)==-1)
+    {
+        printf("Erreur d'envoi du pdu");
+        exit(1);
+    }
+    //printf("Ack envoyé \n");
+        /*
+        printf("Je me connecte\n");
         int test=0;
         int sent= -1;
         int max = 20;
@@ -328,8 +329,8 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr)
         }
         printf("Connected\n");
         pthread_cond_broadcast(&cond);
-        sock.state = CONNECTED;
+        sock.state = CONNECTED;*/
 
-    }
+    
     
 }
