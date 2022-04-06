@@ -268,7 +268,7 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr)
         }else{
             printf("Paquet Ack perdu\n");
         }
-        
+        printf("avant send\n");
         ack.header.ack=1;
         ack.header.ack_num=PA;
         if (IP_send(ack,addr)==-1)
