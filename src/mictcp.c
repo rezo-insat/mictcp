@@ -54,9 +54,10 @@ int mic_tcp_bind(int socket, mic_tcp_sock_addr addr)
 int mic_tcp_accept(int socket, mic_tcp_sock_addr* addr)
 {
     printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
+    /*
     printf("Je vais dormir\n"); 
     pthread_cond_wait(&cond,&mutex);
-    printf("Je suis réveillé\n");
+    printf("Je suis réveillé\n");*/
     sock.state = CONNECTED; 
     
     return 0;
@@ -70,7 +71,7 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
 {
     printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
     //Encpsulation SYN 
- 
+    /*
     mic_tcp_pdu pdusyn;
 
     int sent= -1;
@@ -128,7 +129,7 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
     if(IP_send(ack,sock.addr)==-1){
         printf("Erreur d'envoi du pdu");
         exit(1);
-    }
+    }*/
     printf("Connected\n");
     sock.state=CONNECTED;
     return 0;
@@ -257,6 +258,7 @@ int mic_tcp_close (int socket)
 void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr)
 {
     printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
+    sock.state = CONNECTED;
     if (sock.state == CONNECTED){
         printf("Paquet recu \n");
         printf("ACK NUM %d\n",pdu.header.ack);
