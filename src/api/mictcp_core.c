@@ -105,9 +105,7 @@ int IP_send(mic_tcp_pdu pk, mic_tcp_sock_addr addr)
     } else {
         mic_tcp_payload tmp = get_full_stream(pk);
         int sent_size =  mic_tcp_core_send(tmp);
-
         free (tmp.data);
-
         /* Correct the sent size */
         result = (sent_size == -1) ? -1 : sent_size - API_HD_Size;
     }
@@ -170,9 +168,9 @@ mic_tcp_payload get_full_stream(mic_tcp_pdu pk)
     mic_tcp_payload tmp;
     tmp.size = API_HD_Size + pk.payload.size;
     tmp.data = malloc (tmp.size);
-
     memcpy (tmp.data, &pk.header, API_HD_Size);
     memcpy (tmp.data + API_HD_Size, pk.payload.data, pk.payload.size);
+
 
     return tmp;
 }

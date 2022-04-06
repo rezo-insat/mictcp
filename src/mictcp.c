@@ -2,6 +2,7 @@
 
 #include <mictcp.h>
 #include <api/mictcp_core.h>
+
 #define TIMEOUT 10
 
 /*
@@ -12,17 +13,22 @@
     mic_tcp_pdu pdu;
     int PE,PA = 0;
     float lostpdu = 0.0;
-    float lostrate = 15.0;
+    float lostrate = 0.0;
+    
     float pduemis =0.0;
-    // lost sur 
+    mic_tcp_pdu  ack; 
+    pthread_mutex_t mutex= PTHREAD_MUTEX_INITIALIZER;
+    pthread_cond_t cond= PTHREAD_COND_INITIALIZER;
+ 
+    
 int mic_tcp_socket(start_mode sm)
 {
     int result=-1;
-   printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
-   result = initialize_components(sm); /* Appel obligatoire */
-   sock.fd=result;
-   set_loss_rate(25);
-   return result;
+    printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
+    result = initialize_components(sm); /* Appel obligatoire */
+    sock.fd=result;
+    set_loss_rate(0);
+    return result;
 }
 
 /*
@@ -48,7 +54,11 @@ int mic_tcp_bind(int socket, mic_tcp_sock_addr addr)
 int mic_tcp_accept(int socket, mic_tcp_sock_addr* addr)
 {
     printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
-    sock.state=CONNECTED;
+    printf("Je vais dormir\n"); 
+    pthread_cond_wait(&cond,&mutex);
+    printf("Je suis réveillé\n");
+    sock.state = CONNECTED; 
+    
     return 0;
 }
 
@@ -60,31 +70,66 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
 {
     printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
     //Encpsulation SYN 
-    /*
-    mic_tcp_pdu syn;
+ 
+    mic_tcp_pdu pdusyn;
+
+    int sent= -1;
+    int max = 20;
+    int count = 0;
+    int test=0;
     //syn.header.dest_port= ; 
     
-    syn.header.seq_num = PE; // Création du header et setup PA et PE
-    syn.header.ack_num = PA;
-    syn.header.syn= 1; 
-    syn.header.ack=0;
-    syn.header.fin=0;
+    pdusyn.header.seq_num = PE; // Création du header et setup PA et PE
+    pdusyn.header.ack_num = PA;
+    pdusyn.header.syn= 1; 
+    pdusyn.header.ack=0;
+    pdusyn.header.fin=0;
+    //int lr = (int)lostrate;
+    //itoa(lostrate,pdu.payload.data,10); //Encapsulation du payload vide 
     
-    syn.payload.data = ""; //Encapsulation du payload vide 
-    syn.payload.size = 0;
+    char jpp[] = "";
+    
+    memcpy(&(pdu.payload.data),&jpp,sizeof(jpp));
 
-    if(IP_send(pdu,sock.addr)==-1){
-        printf("Erreur d'envoi de SYN");
+    pdusyn.payload.size = 0;
+
+    
+    pdu.header.ack = 0;
+    pdu.header.syn = 0;
+    
+    while(pdu.header.syn != 1 && pdu.header.ack !=1){
+            
+        if(count == max){return(-1);}
+        if (count != 0)
+            printf("Paquet message perdu \n");
+        count++;
+        if((sent=IP_send(pdusyn,addr))==-1){
+            printf("Erreur d'envoi du pdu\n");
+            exit(1);
+        }
+
+        test=(IP_recv(&pdu,&sock.addr,TIMEOUT) ==-1);  
+        
+        while(count < max && test){
+            count++;
+            if(count == max){return(-1);}
+            if(IP_send(pdusyn,sock.addr)==-1){
+                printf("Erreur d'envoi du pdu");
+                return(1);
+            }
+            test=(IP_recv(&pdu,&sock.addr,TIMEOUT) ==-1);
+        }
+        printf("Count : %d\n",count);
+        if(count == max)
+            exit(-1);
+    }
+    ack.header.ack = 1; 
+
+    if(IP_send(ack,sock.addr)==-1){
+        printf("Erreur d'envoi du pdu");
         exit(1);
     }
-
-    if(IP_recv(&pdu,&sock.addr,TIMEOUT)==-1){
-
-    }
-
-    */
-
-    
+    printf("Connected\n");
     sock.state=CONNECTED;
     return 0;
 }
@@ -98,6 +143,7 @@ int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
     int sent= -1;
     int max = 20;
     int count = 0;
+    int test;
 
     printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
   
@@ -110,14 +156,23 @@ int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
     pdu.payload.size=mesg_size;
 
     mic_tcp_pdu mem = pdu; 
-
+    printf("%d\n",pdu.header.seq_num);
     if((sent=IP_send(pdu,sock.addr))==-1){
         printf("Erreur d'envoi du pdu");
         exit(1);
     }
     PE = (PE +1) %2;
+    
     pduemis++; 
-    int test = (IP_recv(&pdu,&sock.addr,TIMEOUT) ==-1);
+    test = (IP_recv(&pdu,&sock.addr,TIMEOUT) ==-1);
+
+
+    if(pdu.header.ack ==1 ){
+        if(IP_send(ack,sock.addr)==-1){
+            printf("Erreur d'envoi du pdu");
+            exit(1);
+        }
+    }
     
     if (test){  
         lostpdu++;
@@ -125,7 +180,7 @@ int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
     }
     printf("Lost rate= %f \n",(lostpdu/pduemis)*100.0);
     
-    if((lostpdu/pduemis)*100.0 > lostrate && test){
+    if((lostpdu/pduemis)*100.0 >= lostrate && test){
         while(count < max && test){
             count++; 
             printf("Count: %d \n", count);  
@@ -201,23 +256,78 @@ int mic_tcp_close (int socket)
  */
 void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr)
 {
-    mic_tcp_pdu ack; 
     printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
-    if(pdu.header.seq_num == PA){
-        app_buffer_put(pdu.payload);
-        PA = (PA+1) %2;
+    if (sock.state == CONNECTED){
+        printf("Paquet recu \n");
+        printf("ACK NUM %d\n",pdu.header.ack);
+        mic_tcp_pdu ack; 
+       
+        if(pdu.header.seq_num == PA){
+            app_buffer_put(pdu.payload);
+            PA = (PA+1) %2;
+        }else{
+            printf("Paquet Ack perdu\n");
+        }
+        
+        ack.header.ack=1;
+        ack.header.ack_num=PA;
+        if (IP_send(ack,addr)==-1)
+        {
+            printf("Erreur d'envoi du pdu");
+            exit(1);
+        }
+        printf("Ack envoyé \n");
     }else{
-        printf("Paquet Ack perdu\n");
-    }
-   
-    ack.header.ack=1;
-    ack.header.ack_num=PA;
-    if (IP_send(ack,addr)==-1)
-    {
-        printf("Erreur d'envoi du pdu");
-        exit(1);
-    }
-    
-    
+        int test=0;
+        int sent= -1;
+        int max = 20;
+        int count = 0;  
+        mic_tcp_pdu paqu;  
+        while(paqu.header.syn != 1){
+            test=(IP_recv(&paqu,&sock.addr,TIMEOUT) ==-1); 
+            if(test){}
+                //printf("En attente\n");
+        }
+        mic_tcp_pdu sack;
+        
+        sack.header.seq_num = PE; // Création du header et setup PA et PE
+        sack.header.ack_num = PA;
+        sack.header.syn= 1; 
+        sack.header.ack=1;
+        sack.header.fin=0;
+        
+        sack.payload.data = pdu.payload.data;
+        sack.payload.size = sizeof(pdu.payload.data); 
 
+        while(paqu.header.ack != 1){
+                
+            if(count == max){exit(-1);}
+            count++;
+            if (count == 0)
+                printf("Paquet message perdu \n");
+            if((sent=IP_send(sack,sock.addr))==-1){
+                printf("Erreur d'envoi du pdu");
+                exit(1);
+            }
+            test=(IP_recv(&paqu,&sock.addr,TIMEOUT) ==-1);  
+            while(count < max && test){
+                count++;
+                if(count == max){exit(-1);}
+                if(IP_send(sack,sock.addr)==-1){
+                    printf("Erreur d'envoi du pdu");
+                    exit(1);
+                }
+                test=(IP_recv(&paqu,&sock.addr,TIMEOUT) ==-1);
+            }
+
+            printf("Count : %d\n",count);
+            if(count == max)
+                exit(-1);
+        }
+        printf("Connected\n");
+        pthread_cond_broadcast(&cond);
+        sock.state = CONNECTED;
+
+    }
+    
 }
