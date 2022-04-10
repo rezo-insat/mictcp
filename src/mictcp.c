@@ -23,6 +23,7 @@
     
 int mic_tcp_socket(start_mode sm)
 {
+    //ajouter return -1 en cas d'erreur
     int result=-1;
     printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
     result = initialize_components(sm); /* Appel obligatoire */
@@ -58,9 +59,16 @@ int mic_tcp_accept(int socket, mic_tcp_sock_addr* addr)
     printf("Je vais dormir\n"); 
     pthread_cond_wait(&cond,&mutex);
     printf("Je suis réveillé\n");*/
-    sock.state = CONNECTED; 
     
-    return 0;
+    //retourne 0 si sock.state = established, -1 sinon
+    if (sock.fd == socket){
+        sock.state == CONNECTED;
+        return 0;
+    } else {
+        return -1;
+    }
+    
+    
 }
 
 /*
@@ -130,6 +138,9 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
         printf("Erreur d'envoi du pdu");
         exit(1);
     }*/
+
+    //se servir de addr et sock.addr + refaire condition pour avoir 0 ou -1 et c'est tout ??
+
     printf("Connected\n");
     sock.state=CONNECTED;
     return 0;
@@ -147,17 +158,21 @@ int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
     int test;
 
     printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
-  
+    
+    //construction pdu
     pdu.header.syn = 0;
     pdu.header.ack = 0;
     pdu.header.fin = 0;
     pdu.header.seq_num= PE;
      
+    //payload
     pdu.payload.data = mesg;
     pdu.payload.size=mesg_size;
 
     mic_tcp_pdu mem = pdu; 
     //printf("%d\n",pdu.header.seq_num);
+
+    //envoi du pdu
     if((sent=IP_send(pdu,sock.addr))==-1){
         printf("Erreur d'envoi du pdu");
         exit(1);
@@ -235,6 +250,7 @@ int mic_tcp_recv (int socket, char* mesg, int max_mesg_size)
     pdu.payload.data=mesg;
     pdu.payload.size=max_mesg_size;
     return app_buffer_get(pdu.payload);
+    //prendre en compte le cas d'erreur
 }
 
 /*
@@ -247,6 +263,7 @@ int mic_tcp_close (int socket)
     printf("[MIC-TCP] Appel de la fonction :  "); printf(__FUNCTION__); printf("\n");
     sock.state=CLOSED;
     return 0;
+    //faire cas -1 / 0
 }
 
 /*
@@ -260,6 +277,7 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr)
     printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
     printf("Paquet recu \n");
     printf("ACK NUM %d\n",pdu.header.seq_num);
+
     mic_tcp_pdu ack; 
     
     if(pdu.header.seq_num == PA){
@@ -268,8 +286,14 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr)
     }else{
         printf("Paquet Ack perdu\n");
     }
+
+    //construction pdu ack
     ack.header.ack=1;
     ack.header.ack_num=PA;
+    ack.header.fin=0;
+    ack.header.syn=0;
+    //init source port, dest port ??
+
     ack.payload.data =""; 
     ack.payload.size=0;
 
