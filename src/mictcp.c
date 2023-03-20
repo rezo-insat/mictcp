@@ -53,6 +53,21 @@ int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
 {
     printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
     return -1;
+   /*
+   int sent_size = -1;
+   mic_tcp_pdu PDU;
+   pdu.header = ---à remplir---
+   
+   pdu.payload.data=msg;
+   pdu.payload.size=size;
+   
+   sent_size = IP_send(PDU,--adress obtennue au connect--)
+   
+   //Pas besoin de IP receive psq mode non connecté
+   
+   return sent_size;
+   */
+   
 }
 
 /*
@@ -63,6 +78,18 @@ int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
  */
 int mic_tcp_recv (int socket, char* mesg, int max_mesg_size)
 {
+    /*
+    int deliver_size = -1;
+    mic_tcp_payload payload;
+    
+    payload.data = mesg
+    payload.size = max_mesg_size;
+    
+    deliver_size = app.buffer.get(payload);
+    
+    
+    return deliver_size;
+    */
     printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
     return -1;
 }
@@ -86,5 +113,11 @@ int mic_tcp_close (int socket)
  */
 void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr)
 {
-    printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
+   /*
+   app_buffer_put(pdu.payload);
+   
+   // sur version fiable v2 : IP_send(ack)
+   
+   */  
+   printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
 }
