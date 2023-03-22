@@ -89,3 +89,6 @@ Veuillez utiliser, à minima, un tag pour chacune des versions successives de mi
 Aide pour la création d’un dépôt depuis un template : https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template
 
 Manuel d'utilisation de git: https://git-scm.com/docs
+
+## Amélioration
+Implémenter la liste des sockets par une liste chaînée
