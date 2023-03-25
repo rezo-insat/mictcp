@@ -218,8 +218,8 @@ static void file_to_mictcp(char* filename)
 
     /* On effectue la connexion */
     mic_tcp_sock_addr dest_addr;
-    dest_addr.ip_addr = "localhost";
-    dest_addr.ip_addr_size = strlen(dest_addr.ip_addr) + 1; // '\0'
+    dest_addr.ip_addr.addr = "localhost";
+    dest_addr.ip_addr.addr_size = strlen(dest_addr.ip_addr.addr) + 1; // '\0'
     dest_addr.port = MICTCP_PORT;
     if (mic_tcp_connect(sockfd, dest_addr) == -1) {
         printf("ERROR connecting the MICTCP socket\n");
@@ -288,8 +288,8 @@ static void mictcp_to_udp(char *host, int port)
 
     /* On bind le socket mictcp à une adresse locale */
     mic_tcp_sock_addr mt_local_addr;
-    mt_local_addr.ip_addr = NULL;
-    mt_local_addr.ip_addr_size = 0;
+    mt_local_addr.ip_addr.addr = NULL;
+    mt_local_addr.ip_addr.addr_size = 0;
     mt_local_addr.port = MICTCP_PORT;
     if (mic_tcp_bind(mictcp_sockfd, mt_local_addr) == -1) {
         printf("ERROR on binding the MICTCP socket\n");

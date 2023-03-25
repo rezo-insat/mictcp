@@ -10,7 +10,8 @@ int main()
     int sockfd = 0;
     char chaine[MAX_SIZE];
     mic_tcp_sock_addr addr;
-    addr.ip_addr = "127.0.0.1";
+    addr.ip_addr.addr = "127.0.0.1";
+    addr.ip_addr.addr_size = strlen("127.0.0.1") + 1;
     addr.port = 1234;
 
     if ((sockfd = mic_tcp_socket(CLIENT)) == -1)

@@ -94,7 +94,7 @@ int initialize_components(start_mode mode)
 
 
 
-int IP_send(mic_tcp_pdu pk, mic_tcp_sock_addr addr)
+int IP_send(mic_tcp_pdu pk, mic_tcp_ip_addr addr)
 {
 
     int result = 0;
@@ -115,7 +115,7 @@ int IP_send(mic_tcp_pdu pk, mic_tcp_sock_addr addr)
     return result;
 }
 
-int IP_recv(mic_tcp_pdu* pk, mic_tcp_sock_addr* addr, unsigned long timeout)
+int IP_recv(mic_tcp_pdu* pk, mic_tcp_ip_addr* local_addr, mic_tcp_ip_addr* remote_addr, unsigned long timeout)
 {
     int result = -1;
 
@@ -148,12 +148,15 @@ int IP_recv(mic_tcp_pdu* pk, mic_tcp_sock_addr* addr, unsigned long timeout)
         memcpy (pk->payload.data, buffer + API_HD_Size, pk->payload.size);
 
         /* Generate a stub address */
-        if (addr != NULL) {
-            addr->ip_addr = "localhost";
-            addr->ip_addr_size = strlen(addr->ip_addr) + 1; // don't forget '\0'
-            addr->port = pk->header.source_port;
+        if (remote_addr != NULL) {
+            remote_addr->addr = "localhost";
+            remote_addr->addr_size = strlen(remote_addr->addr) + 1; // don't forget '\0'
         }
 
+        if (local_addr != NULL) {
+            local_addr->addr = "localhost";
+            local_addr->addr_size = strlen(local_addr->addr) + 1; // don't forget '\0'
+        }
         /* Correct the receved size */
         result -= API_HD_Size;
     }
@@ -290,7 +293,8 @@ void* listening(void* arg)
 {
     mic_tcp_pdu pdu_tmp;
     int recv_size;
-    mic_tcp_sock_addr remote;
+    mic_tcp_ip_addr remote;
+    mic_tcp_ip_addr local;
 
     pthread_mutex_init(&lock, NULL);
 
@@ -304,11 +308,11 @@ void* listening(void* arg)
     while(1)
     {
         pdu_tmp.payload.size = payload_size;
-        recv_size = IP_recv(&pdu_tmp, &remote, 0);
+        recv_size = IP_recv(&pdu_tmp, &local, &remote, 0);
 
         if(recv_size != -1)
         {
-            process_received_PDU(pdu_tmp, remote);
+            process_received_PDU(pdu_tmp, local, remote);
         } else {
             /* This should never happen */
             printf("Error in recv\n");

@@ -31,12 +31,20 @@ typedef enum protocol_state
 typedef enum start_mode { CLIENT, SERVER } start_mode;
 
 /*
+ * Structure d’une adresse IP
+ */
+typedef struct mic_tcp_ip_addr
+{
+    char * addr;
+    int addr_size;
+} mic_tcp_ip_addr;
+
+/*
  * Structure d’une adresse de socket
  */
 typedef struct mic_tcp_sock_addr
 {
-    char * ip_addr;
-    int ip_addr_size;
+    mic_tcp_ip_addr ip_addr;
     unsigned short port;
 } mic_tcp_sock_addr;
 
@@ -47,7 +55,8 @@ typedef struct mic_tcp_sock
 {
   int fd;  /* descripteur du socket */
   protocol_state state; /* état du protocole */
-  mic_tcp_sock_addr addr; /* adresse du socket */
+  mic_tcp_sock_addr local_addr; /* adresse locale du socket */
+  mic_tcp_sock_addr remote_addr; /* adresse distante du socket */
 } mic_tcp_sock;
 
 /*
@@ -99,7 +108,7 @@ int mic_tcp_accept(int socket, mic_tcp_sock_addr* addr);
 int mic_tcp_connect(int socket, mic_tcp_sock_addr addr);
 int mic_tcp_send (int socket, char* mesg, int mesg_size);
 int mic_tcp_recv (int socket, char* mesg, int max_mesg_size);
-void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr);
+void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_ip_addr local_addr, mic_tcp_ip_addr remote_addr);
 int mic_tcp_close(int socket);
 
 #endif

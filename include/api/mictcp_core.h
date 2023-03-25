@@ -10,8 +10,8 @@
 
 int initialize_components(start_mode sm);
 
-int IP_send(mic_tcp_pdu, mic_tcp_sock_addr);
-int IP_recv(mic_tcp_pdu*, mic_tcp_sock_addr*, unsigned long timeout);
+int IP_send(mic_tcp_pdu, mic_tcp_ip_addr);
+int IP_recv(mic_tcp_pdu* pk, mic_tcp_ip_addr* local_addr, mic_tcp_ip_addr* remote_addr, unsigned long timeout);
 int app_buffer_get(mic_tcp_payload);
 void app_buffer_put(mic_tcp_payload);
 

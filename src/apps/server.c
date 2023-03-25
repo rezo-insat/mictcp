@@ -10,7 +10,8 @@ int main()
     mic_tcp_sock_addr remote_addr;
     char chaine[MAX_SIZE];
 
-    addr.ip_addr = "127.0.0.1";
+    addr.ip_addr.addr = "127.0.0.1";
+    addr.ip_addr.addr_size = strlen(addr.ip_addr.addr) + 1;
     addr.port = 1234;
 
 
