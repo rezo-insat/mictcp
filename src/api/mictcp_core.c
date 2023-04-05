@@ -302,9 +302,11 @@ void* listening(void* arg)
 
 
     while(1)
-    {
+    {   
         pdu_tmp.payload.size = payload_size;
+        printf("je vais recv\n");
         recv_size = IP_recv(&pdu_tmp, &remote, 0);
+        printf("j'ai recv\n");
 
         if(recv_size != -1)
         {
