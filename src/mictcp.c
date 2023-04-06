@@ -120,11 +120,13 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
 	printf("Remote Address Port: %hu\n", addr.port);
 
     IP_send(pdu, tab_sockets[socket].dist_addr);
+	tab_sockets[socket].socket.state = SYN_SENT;
 	while (1)
 	{
 		sleep(timeout);
         printf("timeout\n");
-		if (tab_sockets[socket].socket.state == WAITING)
+        printf("Socket state : %d, SYN SENT = %d\n",tab_sockets[socket].socket.state,SYN_SENT );
+		if (tab_sockets[socket].socket.state == SYN_SENT)
 		{
 			IP_send(pdu, tab_sockets[socket].dist_addr);
 		}
@@ -165,13 +167,13 @@ int mic_tcp_send(int mic_sock, char *mesg, int mesg_size)
 	IP_send(pdu, tab_sockets[mic_sock].dist_addr);
 	tab_sockets[mic_sock].NoSeqLoc = (tab_sockets[mic_sock].NoSeqLoc + 1) % 2;
 
-	tab_sockets[mic_sock].socket.state = SYN_SENT;
+	tab_sockets[mic_sock].socket.state = WAITING;
 	int sent_size = IP_send(pdu, tab_sockets[mic_sock].dist_addr);
 
 	while (1)
 	{
 		sleep(timeout);
-		if (tab_sockets[mic_sock].socket.state == SYN)
+		if (tab_sockets[mic_sock].socket.state == WAITING)
 		{
 			sent_size = IP_send(pdu, tab_sockets[mic_sock].dist_addr);
 		}
@@ -256,6 +258,7 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr) //addr = adre
 
 		tab_sockets[mic_sock].socket.state = SYN_RECEIVED;
 
+		display_mic_tcp_pdu(pdu_r, "Pdu SYN ACK : \n");
 		while (1)
 		{
 
@@ -271,7 +274,7 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr) //addr = adre
 			}
 		}
 	}
-	else if (pdu.header.ack == 1 && pdu.header.syn && tab_sockets[mic_sock].socket.state == SYN_SENT)
+	else if (pdu.header.ack == 1 && pdu.header.syn == 1 && tab_sockets[mic_sock].socket.state == SYN_SENT)
 	{ // si SYN ACK reçu envoyer ACK
 
 		printf("PDU SYN ACK recu\n");

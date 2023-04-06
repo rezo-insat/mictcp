@@ -81,6 +81,7 @@ int initialize_components(start_mode mode)
             local_addr.sin_port = htons(API_SC_Port);
             local_addr.sin_addr.s_addr = htonl(INADDR_ANY);
             bnd = bind(sys_socket, (struct sockaddr *) &local_addr, sizeof(local_addr));
+            pthread_create (&listen_th, NULL, listening, "1");
         }
     }
 
