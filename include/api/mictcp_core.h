@@ -28,7 +28,7 @@ unsigned long get_now_time_usec();
 #ifndef API_SC_Port
   #define API_SC_Port 8525
 #endif
-#define API_HD_Size 15
+#define API_HD_Size 16
 
 typedef struct ip_payload
 {
