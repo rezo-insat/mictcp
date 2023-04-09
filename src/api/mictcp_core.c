@@ -97,14 +97,26 @@ int initialize_components(start_mode mode)
 int IP_send(mic_tcp_pdu pk, mic_tcp_ip_addr addr)
 {
 
-    int result = 0;
+    int result = -1;
+    int random = rand();
+    int lr_tresh = (int) round(((float)loss_rate/100.0)*RAND_MAX);
+    struct hostent * hp;
 
     if(initialized == -1) {
         result = -1;
 
     } else {
         mic_tcp_payload tmp = get_full_stream(pk);
-        int sent_size =  mic_tcp_core_send(tmp);
+        int sent_size = tmp.size;
+
+        if(random > lr_tresh) {
+           hp = gethostbyname(addr.addr);
+           memcpy (&(remote_addr.sin_addr.s_addr), hp->h_addr, hp->h_length);
+           sent_size = sendto(sys_socket, tmp.data, tmp.size, 0, (struct sockaddr *)&remote_addr, sizeof(struct sockaddr));
+           printf("[MICTCP-CORE] Envoi d'un paquet IP de taille %d vers l'adresse %s\n", sent_size, addr.addr);
+        } else {
+           printf("[MICTCP-CORE] Perte du paquet\n");
+        }
 
         free (tmp.data);
 
@@ -149,7 +161,8 @@ int IP_recv(mic_tcp_pdu* pk, mic_tcp_ip_addr* local_addr, mic_tcp_ip_addr* remot
 
         /* Generate a stub address */
         if (remote_addr != NULL) {
-            remote_addr->addr = "localhost";
+            inet_ntop(AF_INET, &(tmp_addr.sin_addr),remote_addr->addr,remote_addr->addr_size);
+            //remote_addr->addr = "localhost";
             remote_addr->addr_size = strlen(remote_addr->addr) + 1; // don't forget '\0'
         }
 
@@ -157,8 +170,12 @@ int IP_recv(mic_tcp_pdu* pk, mic_tcp_ip_addr* local_addr, mic_tcp_ip_addr* remot
             local_addr->addr = "localhost";
             local_addr->addr_size = strlen(local_addr->addr) + 1; // don't forget '\0'
         }
+
+        printf("[MICTCP-CORE] Réception d'un paquet IP de taille %d provenant de %s\n", result, remote_addr->addr);
+
         /* Correct the receved size */
         result -= API_HD_Size;
+
     }
 
     /* Free the reception buffer */
@@ -198,29 +215,7 @@ mic_tcp_header get_mic_tcp_header(ip_payload packet)
     return tmp;
 }
 
-int full_send(mic_tcp_payload buff)
-{
-    int result = 0;
 
-    result = sendto(sys_socket, buff.data, buff.size, 0, (struct sockaddr *)&remote_addr, sizeof(remote_addr));
-
-    return result;
-}
-
-int mic_tcp_core_send(mic_tcp_payload buff)
-{
-    int random = rand();
-    int result = buff.size;
-    int lr_tresh = (int) round(((float)loss_rate/100.0)*RAND_MAX);
-
-    if(random > lr_tresh) {
-        result = sendto(sys_socket, buff.data, buff.size, 0, (struct sockaddr *)&remote_addr, sizeof(struct sockaddr));
-    } else {
-        printf("[MICTCP-CORE] Perte du paquet\n");
-    }
-
-    return result;
-}
 
 int app_buffer_get(mic_tcp_payload app_buff)
 {
@@ -304,9 +299,13 @@ void* listening(void* arg)
     pdu_tmp.payload.size = payload_size;
     pdu_tmp.payload.data = malloc(payload_size);
 
+    remote.addr=malloc(100);
+    remote.addr_size=100;
+
 
     while(1)
     {
+        remote.addr_size=100;
         pdu_tmp.payload.size = payload_size;
         recv_size = IP_recv(&pdu_tmp, &local, &remote, 0);
 
