@@ -2,14 +2,27 @@
 #include <api/mictcp_core.h>
 #define NBR_SOCKETS 1024
 #define TIMEOUT_DEFAUT 1
-// FONCTIONS
+#define WINDOW_SIZE 10
+#define LOSS_ACCEPTABILITY 10 // sur 10
+
+
+//================================== STRUCTURES =============================
+
+typedef struct {
+	char table[WINDOW_SIZE];
+	char last_index;
+} circularBuffer;
+
+
 typedef struct
 {
 	mic_tcp_sock socket;
 	mic_tcp_sock_addr dist_addr;
 	char NoSeqLoc;	// = -1;
 	char NoSeqDist; // = -1;
+	circularBuffer buffer;
 } enhanced_socket;
+
 
 typedef struct
 {
@@ -18,12 +31,17 @@ typedef struct
 }arg_thread;
 
 
+//================================== VARIABLES GLOBALES =============================
+
 static int socket_desc = 0;
 static enhanced_socket tab_sockets[NBR_SOCKETS];
 int timeout = TIMEOUT_DEFAUT;
 pthread_t attente_ack_tid;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t end_accept_cond = PTHREAD_COND_INITIALIZER;
+
+
+//================================== SIGNATURES DES FONCTIONS PRIVEES =============================
 
 int valid_socket(int socket);
 int bound_socket(int socket);
@@ -33,6 +51,12 @@ void display_enhanced_socket(enhanced_socket sock, char* prefix);
 void display_mic_tcp_sock_addr(mic_tcp_sock_addr addr, char* prefix);
 void * attente_ack(void * arg);
 void error(char * message, int line);
+void addValueCircularBuff(circularBuffer* buffer, char Value );
+int accept_loss(int socket);
+
+//================================== FONCTIONS DE MICTCP =============================
+
+
 /*
  * Permet de créer un socket entre l’application et MIC-TCP
  * Retourne le descripteur du socket ou bien -1 en cas d'erreur
@@ -82,7 +106,7 @@ int mic_tcp_bind(int socket, mic_tcp_sock_addr addr)
 }
 
 /*
- * Met le socket en état d'acceptation de connexion
+ * Met le socket en état d'acceptation de connexion et bloque jusqu'a ce que la connexion soit établie
  * Retourne 0 si succès, -1 si erreur
  */
 int mic_tcp_accept(int socket, mic_tcp_sock_addr *addr)
@@ -114,12 +138,7 @@ int mic_tcp_accept(int socket, mic_tcp_sock_addr *addr)
 
 int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
 {
-	// if(!bound_socket(socket)){
-	// 	printf("Socket not bound, cannot connect to specified address\n");
-	// 	exit(1);
-	// }
 	tab_sockets[socket].dist_addr = addr;
-	// tab_sockets[socket].NoSeqDist = 0;
 	tab_sockets[socket].NoSeqLoc = 0;
 	// create pdu syn
 	mic_tcp_pdu pdu;
@@ -132,7 +151,6 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
 	pdu.header.fin = 0;
 
 
-	// tab_sockets[socket].NoSeqLoc = 1; 
 	pdu.payload.data = NULL;
 	pdu.payload.size = 0;
     display_enhanced_socket(tab_sockets[socket], "état du socket");
@@ -142,6 +160,7 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
 
     IP_send(pdu, tab_sockets[socket].dist_addr);
 	tab_sockets[socket].socket.state = SYN_SENT;
+	
 	while (1)
 	{
         printf("Socket state : %d, SYN SENT = %d\n",tab_sockets[socket].socket.state,SYN_SENT );
@@ -185,12 +204,17 @@ int mic_tcp_send(int mic_sock, char *mesg, int mesg_size)
 	pdu.payload.data = mesg;
 	pdu.payload.size = mesg_size;
 
-	IP_send(pdu, tab_sockets[mic_sock].dist_addr);
+	int sent_size =IP_send(pdu, tab_sockets[mic_sock].dist_addr);
 	tab_sockets[mic_sock].NoSeqLoc = (tab_sockets[mic_sock].NoSeqLoc + 1) % 2;
+	
+	addValueCircularBuff(&tab_sockets[mic_sock].buffer,0);
+	if (accept_loss(mic_sock))
+	{
+		return sent_size;
+	}
+	
 
 	tab_sockets[mic_sock].socket.state = WAITING;
-	int sent_size = IP_send(pdu, tab_sockets[mic_sock].dist_addr);
-
 	while (1)
 	{
 		sleep(timeout);
@@ -266,7 +290,7 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr) //addr = adre
 		tab_sockets[mic_sock].dist_addr = addr;
 		pdu_r.header.source_port = tab_sockets[mic_sock].socket.addr.port;
 		pdu_r.header.dest_port = tab_sockets[mic_sock].dist_addr.port;
-		pdu_r.header.seq_num = tab_sockets[mic_sock].NoSeqLoc; // NOSEQLOC INITIALISE ?
+		pdu_r.header.seq_num = tab_sockets[mic_sock].NoSeqLoc;
 		pdu_r.header.ack_num = tab_sockets[mic_sock].NoSeqDist;
 		pdu_r.header.syn = 1;
 		pdu_r.header.ack = 1;
@@ -277,7 +301,6 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr) //addr = adre
         
         display_mic_tcp_sock_addr(tab_sockets[mic_sock].dist_addr, "à l'adresse:");
 		IP_send(pdu_r, tab_sockets[mic_sock].dist_addr);
-		//tab_sockets[mic_sock].NoSeqLoc = (tab_sockets[mic_sock].NoSeqLoc + 1) % 2; //update n° de séquence local
 
 		tab_sockets[mic_sock].socket.state = SYN_RECEIVED;
 
@@ -377,9 +400,9 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr) //addr = adre
 	}
 	else if (pdu.header.ack == 1 && tab_sockets[mic_sock].socket.state == WAITING && (tab_sockets[mic_sock].NoSeqLoc != pdu.header.ack_num))
 	{
-		// si ACK de bon numéro de séquence passer au n° de seq suivant
+		// si ACK de bon numéro de séquence
 		printf("PDU ACK de Data recu \n");
-		//tab_sockets[mic_sock].NoSeqLoc = (tab_sockets[mic_sock].NoSeqLoc) + 1 % 2;
+		addValueCircularBuff(&tab_sockets[mic_sock].buffer,1); // PDU bien reçu
 		tab_sockets[mic_sock].socket.state = ESTABLISHED;
 	}
 	else if (pdu.header.ack ==0 && pdu.header.syn == 0 && pdu.header.fin ==0){
@@ -406,7 +429,11 @@ int mic_tcp_close(int socket)
 	return -1;
 }
 
-/*---------------------------------------------*/
+
+
+//================================== CORPS DES FONCTIONS PRIVEES =============================
+
+
 int valid_socket(int socket)
 {
 	if (socket > socket_desc - 1 || tab_sockets[socket].socket.fd == -1)
@@ -501,4 +528,19 @@ void * attente_ack(void * arg) {
 void error(char * message, int line){
     printf("%s at line %d\n",message,line);
     exit(1);
+}
+
+int accept_loss(int socket){
+	int sum = 0;
+	for(int i = 0; i < WINDOW_SIZE; i++){ // somme de tous les packets reçus
+		sum += tab_sockets[socket].buffer.table[i];
+	}
+	if(sum < WINDOW_SIZE - LOSS_ACCEPTABILITY){// si le nombre de packets reçus est inférieur au nombre acceptable
+		return 0; // on accepte pas la perte
+	}
+	return 1;
+}
+
+void addValueCircularBuff(circularBuffer* buffer, char Value ){
+	buffer->table[buffer->last_index+1%WINDOW_SIZE]=Value;
 }
