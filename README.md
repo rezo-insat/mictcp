@@ -1,6 +1,6 @@
 # BE RESEAU
 ## TPs BE Reseau - 3 MIC
-
+https://prod.liveshare.vsengsaas.visualstudio.com/join?3E3C1F159C72097BE372EC7FDC36557516BD
 
 Les détails du sujet du BE est accessible depuis le cours "Programmation Système et Réseau" sur moodle.
 
