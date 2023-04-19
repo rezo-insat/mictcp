@@ -1,9 +1,9 @@
 #include <mictcp.h>
 #include <api/mictcp_core.h>
 #define NBR_SOCKETS 1024
-#define TIMEOUT_DEFAUT 1
+#define TIMEOUT_DEFAUT 1000
 #define WINDOW_SIZE 10
-#define LOSS_ACCEPTABILITY 10 // sur 10
+#define LOSS_ACCEPTABILITY 0 // sur 10
 
 
 //================================== STRUCTURES =============================
@@ -36,6 +36,7 @@ typedef struct
 static int socket_desc = 0;
 static enhanced_socket tab_sockets[NBR_SOCKETS];
 int timeout = TIMEOUT_DEFAUT;
+int established = 0;
 pthread_t attente_ack_tid;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t end_accept_cond = PTHREAD_COND_INITIALIZER;
@@ -115,14 +116,15 @@ int mic_tcp_accept(int socket, mic_tcp_sock_addr *addr)
 	printf(__FUNCTION__);
 	printf("\n");
 
-	if (valid_socket(socket) && tab_sockets[socket].socket.state == WAITING)
+	if (valid_socket(socket))
 	{
 		tab_sockets[socket].socket.state = ACCEPTING;
-		while (tab_sockets[socket].socket.state != ESTABLISHED){
+		while (tab_sockets[socket].socket.state != ESTABLISHED){ //attente jusqu'a l'etablissement de la connexion
 			if(pthread_mutex_lock(&mutex)!= 0){error("erreur lock mutex",__LINE__);} //lock mutex
 			pthread_cond_wait(&end_accept_cond,&mutex);
 			if(pthread_mutex_unlock(&mutex)!= 0){error("erreur unlock mutex",__LINE__);} //unlock mutex
 		}
+		display_enhanced_socket(tab_sockets[socket], "État du socket aprés la connection :");
 		return 0;
 	}
 	
@@ -160,22 +162,56 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
 
     IP_send(pdu, tab_sockets[socket].dist_addr);
 	tab_sockets[socket].socket.state = SYN_SENT;
+
+	mic_tcp_pdu pdu_r;
+	mic_tcp_sock_addr addr_r;
 	
 	while (1)
 	{
-        printf("Socket state : %d, SYN SENT = %d\n",tab_sockets[socket].socket.state,SYN_SENT );
-		if (tab_sockets[socket].socket.state == SYN_SENT)
-		{
+		sleep(timeout);
+		if (IP_recv(&pdu_r,&addr_r, timeout) == -1){
 			IP_send(pdu, tab_sockets[socket].dist_addr);
+			printf("j'envoie un doublon du syn\n");
+			continue;
 		}
-		else if (tab_sockets[socket].socket.state == ESTABLISHED)
-		{
+		display_mic_tcp_pdu(pdu_r,"pdu reçu :");
+
+		if (pdu_r.header.ack == 1 && pdu_r.header.syn == 1){
+			printf("Bon PDU SYN ACK recu \n");
+
+			tab_sockets[socket].NoSeqDist = pdu.header.seq_num; // récupérer n° de seq du client
+
+
+			pdu.header.source_port = tab_sockets[socket].socket.addr.port;
+			pdu.header.dest_port = tab_sockets[socket].dist_addr.port;
+			pdu.header.seq_num = -1;
+			pdu.header.ack_num = tab_sockets[socket].NoSeqDist;
+			pdu.header.syn = 0;
+			pdu.header.ack = 1;
+			pdu.header.fin = 0;
+			pdu.payload.size = 0;
+			pdu.payload.data = NULL;
+
+			IP_send(pdu, tab_sockets[socket].dist_addr);
+
+
+			printf("PDU ACK de connexion envoyé\n");
+			display_mic_tcp_sock_addr(tab_sockets[socket].dist_addr, "à l'adresse:");
+			display_mic_tcp_pdu(pdu, "Pdu ACK : \n");
+
+			mic_tcp_pdu* args = malloc(sizeof(mic_tcp_pdu));
+			args->header=pdu.header;
+			args->payload=pdu.payload;
+
+			tab_sockets[socket].socket.state = ESTABLISHED;
+			
 			break;
 		}
-		sleep(timeout);
-        printf("timeout\n");
+		
+       
 	}
 
+	display_enhanced_socket(tab_sockets[socket], "État du socket aprés l'établissement de la connection :");
 	return 0;
 }
 
@@ -204,29 +240,59 @@ int mic_tcp_send(int mic_sock, char *mesg, int mesg_size)
 	pdu.payload.data = mesg;
 	pdu.payload.size = mesg_size;
 
-	int sent_size =IP_send(pdu, tab_sockets[mic_sock].dist_addr);
-	tab_sockets[mic_sock].NoSeqLoc = (tab_sockets[mic_sock].NoSeqLoc + 1) % 2;
-	
-	addValueCircularBuff(&tab_sockets[mic_sock].buffer,0);
-	if (accept_loss(mic_sock))
-	{
-		return sent_size;
-	}
+	int sent_size = IP_send(pdu, tab_sockets[mic_sock].dist_addr);
 	
 
 	tab_sockets[mic_sock].socket.state = WAITING;
+	mic_tcp_pdu pdu_r;
+	mic_tcp_sock_addr addr_r;
+
 	while (1)
 	{
-		sleep(timeout);
-		if (tab_sockets[mic_sock].socket.state == WAITING)
-		{
+		if (IP_recv(&pdu_r,&addr_r, timeout) == -1){
 			sent_size = IP_send(pdu, tab_sockets[mic_sock].dist_addr);
+			printf("j'envoie un doublon\n");
+			continue;
 		}
-		else if (tab_sockets[mic_sock].socket.state == ESTABLISHED)
-		{
+		printf("PDU ACK de Data recu \n");
+		display_mic_tcp_pdu(pdu_r,"pdu reçu :");
+
+		if (pdu_r.header.ack == 1 && (tab_sockets[mic_sock].NoSeqLoc == pdu_r.header.ack_num)){
+			printf("le bon Ack a été reçu\n");
+			if(!established){ //stoppe le thread de syn ack quand on est sûrs que la connexion est établie
+				established = 1;
+			}
+			tab_sockets[mic_sock].socket.state = ESTABLISHED;
 			break;
+		}else if(pdu_r.header.ack == 1 && pdu_r.header.syn == 1){
+			printf("PDU SYN ACK recu a nouveau (Doublon) \n");
+			mic_tcp_pdu pdu_d;
+
+			pdu_d.header.source_port = tab_sockets[mic_sock].socket.addr.port;
+			pdu_d.header.dest_port = tab_sockets[mic_sock].dist_addr.port;
+			pdu_d.header.seq_num = -1;
+			pdu_d.header.ack_num = tab_sockets[mic_sock].NoSeqDist;
+			pdu_d.header.syn = 0;
+			pdu_d.header.ack = 1;
+			pdu_d.header.fin = 0;
+
+			pdu_d.payload.size = 0;
+			pdu_d.payload.data = NULL;
+
+			IP_send(pdu_d, tab_sockets[mic_sock].dist_addr);
+			printf("PDU ACK de connexion renvoyé\n");
+
+			display_mic_tcp_pdu(pdu_d, "Pdu ACK : \n");
 		}
+		
+
+		// si ACK de bon numéro de séquence
+		// addValueCircularBuff(&tab_sockets[mic_sock].buffer,1); // PDU bien reçu
+		//update seq num ?
+		// tab_sockets[mic_sock].socket.state = ESTABLISHED;
+
 	}
+	tab_sockets[mic_sock].NoSeqLoc = (tab_sockets[mic_sock].NoSeqLoc + 1) % 2; //maj du no de seq uniquement lorsque ACK reçu (= synchronisation du noseq entre puits et src)
 	return sent_size;
 }
 
@@ -270,7 +336,6 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr) //addr = adre
 	int mic_sock;  
 
     display_mic_tcp_pdu(pdu, "pdu reçu");
-	printf("display finished \n");
 
 	for (mic_sock = 0; (mic_sock < socket_desc) && !(tab_sockets[mic_sock].socket.addr.port==pdu.header.dest_port); mic_sock++)
 		; // trouver le socket destinataire
@@ -316,55 +381,31 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr) //addr = adre
 
 
 	}
-	else if (pdu.header.ack == 1 && pdu.header.syn == 1 && tab_sockets[mic_sock].socket.state == SYN_SENT)
-	{ // si SYN ACK reçu envoyer ACK
+	else if (pdu.header.syn == 1 && tab_sockets[mic_sock].socket.state == SYN_RECEIVED) // si Doublon PDU SYN
+	{	
+		printf("Doublon PDU SYN recu\n");
+		// mic_tcp_pdu pdu_r;
 
-		printf("PDU SYN ACK recu\n");
-		tab_sockets[mic_sock].socket.state = ESTABLISHED;
-		tab_sockets[mic_sock].NoSeqDist = pdu.header.seq_num; // récupérer n° de seq du client
-		mic_tcp_pdu pdu_r;
+		// tab_sockets[mic_sock].NoSeqDist = pdu.header.seq_num;
+		// tab_sockets[mic_sock].dist_addr = addr;
+		// pdu_r.header.source_port = tab_sockets[mic_sock].socket.addr.port;
+		// pdu_r.header.dest_port = tab_sockets[mic_sock].dist_addr.port;
+		// pdu_r.header.seq_num = tab_sockets[mic_sock].NoSeqLoc;
+		// pdu_r.header.ack_num = tab_sockets[mic_sock].NoSeqDist;
+		// pdu_r.header.syn = 1;
+		// pdu_r.header.ack = 1;
+		// pdu_r.header.fin = 0;
 
-		pdu_r.header.source_port = tab_sockets[mic_sock].socket.addr.port;
-		pdu_r.header.dest_port = tab_sockets[mic_sock].dist_addr.port;
-		pdu_r.header.seq_num = -1;
-		pdu_r.header.ack_num = tab_sockets[mic_sock].NoSeqDist;
-		pdu_r.header.syn = 0;
-		pdu_r.header.ack = 1;
-		pdu_r.header.fin = 0;
-
-		pdu_r.payload.size = 0;
-		pdu_r.payload.data = NULL;
-
-		IP_send(pdu_r, tab_sockets[mic_sock].dist_addr);
+		// pdu_r.payload.size = 0;
+		// pdu_r.payload.data = NULL;
+        
+        // display_mic_tcp_sock_addr(tab_sockets[mic_sock].dist_addr, "à l'adresse:");
+		// IP_send(pdu_r, tab_sockets[mic_sock].dist_addr);
 
 
-		printf("PDU ACK de connexion envoyé\n");
-		display_mic_tcp_sock_addr(tab_sockets[mic_sock].dist_addr, "à l'adresse:");
-		display_mic_tcp_pdu(pdu_r, "Pdu ACK : \n");
+		// display_mic_tcp_pdu(pdu_r, "Pdu SYN ACK : \n");
 
-	}
-	else if (pdu.header.ack == 1 && pdu.header.syn == 1 && tab_sockets[mic_sock].socket.state == ESTABLISHED)
-	{ // si SYN ACK reçu à nouveau renvoyer ACK
 
-		printf("PDU SYN ACK recu a nouveau (Doublon) \n");
-		mic_tcp_pdu pdu_r;
-
-		pdu_r.header.source_port = tab_sockets[mic_sock].socket.addr.port;
-		pdu_r.header.dest_port = tab_sockets[mic_sock].dist_addr.port;
-		pdu_r.header.seq_num = -1;
-		pdu_r.header.ack_num = tab_sockets[mic_sock].NoSeqDist;
-		pdu_r.header.syn = 0;
-		pdu_r.header.ack = 1;
-		pdu_r.header.fin = 0;
-
-		pdu_r.payload.size = 0;
-		pdu_r.payload.data = NULL;
-
-		IP_send(pdu_r, tab_sockets[mic_sock].dist_addr);
-		printf("PDU ACK de connexion renvoyé\n");
-
-		display_mic_tcp_pdu(pdu_r, "Pdu ACK : \n");
-		
 	}
 	else if(pdu.header.ack == 0 && pdu.header.seq_num == tab_sockets[mic_sock].NoSeqDist && tab_sockets[mic_sock].socket.state == ESTABLISHED)
 	{ // Si PDU de DATA 
@@ -378,7 +419,7 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr) //addr = adre
 		pdu_r.header.ack = 1;
 		pdu_r.header.fin = 0;
 		pdu_r.payload.size =0;
-		tab_sockets[mic_sock].NoSeqDist = (tab_sockets[mic_sock].NoSeqDist) + 1 % 2; //update n° seq distant
+		tab_sockets[mic_sock].NoSeqDist = ((tab_sockets[mic_sock].NoSeqDist) + 1) % 2; //update n° seq distant
 		display_mic_tcp_pdu(pdu_r,"pdu ack créé :");
 		display_mic_tcp_sock_addr(tab_sockets[mic_sock].dist_addr, "adresse de destination :");
 		IP_send(pdu_r, tab_sockets[mic_sock].dist_addr);
@@ -386,6 +427,24 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr) //addr = adre
 
 		app_buffer_put(pdu.payload); // envoyer la data dans le buffer
 		printf("data in the buffer\n");
+	}
+	else if(pdu.header.ack == 0 && pdu.header.seq_num != tab_sockets[mic_sock].NoSeqDist && tab_sockets[mic_sock].socket.state == ESTABLISHED)
+	{ // Si Doublon PDU de DATA 
+		printf("PDU data recu (Doublon)\n");
+		mic_tcp_pdu pdu_r;
+        pdu_r.header.source_port = tab_sockets[mic_sock].socket.addr.port;
+		pdu_r.header.dest_port = tab_sockets[mic_sock].dist_addr.port;
+		pdu_r.header.seq_num = -1;
+		pdu_r.header.ack_num = tab_sockets[mic_sock].NoSeqDist;
+		pdu_r.header.syn = 0;
+		pdu_r.header.ack = 1;
+		pdu_r.header.fin = 0;
+		pdu_r.payload.size =0;
+		display_mic_tcp_pdu(pdu_r,"pdu ack créé :");
+		display_mic_tcp_sock_addr(tab_sockets[mic_sock].dist_addr, "adresse de destination :");
+		IP_send(pdu_r, tab_sockets[mic_sock].dist_addr);
+		printf("pdu ack envoyé\n");
+
 	}
 	else if (pdu.header.ack == 1 && tab_sockets[mic_sock].socket.state == SYN_RECEIVED)
 	{ // Si ACK de connection reçu
@@ -402,10 +461,13 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr) //addr = adre
 	{
 		// si ACK de bon numéro de séquence
 		printf("PDU ACK de Data recu \n");
-		addValueCircularBuff(&tab_sockets[mic_sock].buffer,1); // PDU bien reçu
+		// addValueCircularBuff(&tab_sockets[mic_sock].buffer,1); // PDU bien reçu
+		//update seq num ?
 		tab_sockets[mic_sock].socket.state = ESTABLISHED;
 	}
-	else if (pdu.header.ack ==0 && pdu.header.syn == 0 && pdu.header.fin ==0){
+	else{
+
+		printf("PDU inattendu recu :\n");
 		display_enhanced_socket(tab_sockets[mic_sock], "l'état du socket");
 	}
 }
@@ -508,6 +570,8 @@ void display_mic_tcp_sock_addr(mic_tcp_sock_addr addr, char* prefix) {
   	printf("Port: %hu\n", addr.port);
 }
 
+
+
 void * attente_ack(void * arg) {
 	printf("début thread d'envoi de SYN ACK'\n");
 	arg_thread* args = (arg_thread*)arg;
@@ -516,6 +580,7 @@ void * attente_ack(void * arg) {
 			if (tab_sockets[args->socket].socket.state == SYN_RECEIVED)
 			{
 				IP_send(args->pdu_r, tab_sockets[args->socket].dist_addr);
+				printf("je renvoie le Syn ack\n");
 			}
 			else if (tab_sockets[args->socket].socket.state == ESTABLISHED)
 			{
