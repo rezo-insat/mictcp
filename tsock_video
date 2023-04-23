@@ -4,8 +4,28 @@ puits=false
 sourc=false
 protocol="tcp"
 port=`expr \`id -u\` % 3000 + 14578`
+interrupted=1
 
 usage() { echo "Usage: $0 [[-p|-s] [-t (tcp|mictcp)]" 1>&2; exit 1; }
+
+# Stop all components gracefully
+function graceful_stop ()
+{
+
+    echo "Arret"
+    killall -9 cvlc > /dev/null 2>&1
+    killall -9 vlc > /dev/null 2>&1
+    killall -9 gateway > /dev/null 2>&1
+
+    if [ $interrupted -eq 1 ]; then
+        # Set return code to 2
+        exit 2
+    fi
+}
+ 
+# initialise trap to call graceful_stop function
+# when signal 2 (SIGINT) is received
+trap "graceful_stop" 2
 
 while getopts "pst:" o; do
     case "${o}" in
@@ -55,9 +75,5 @@ fi
 
 echo "Appuyez sur ENTREE pour arreter"
 read line
-
-echo "Arret"
-killall -9 cvlc > /dev/null 2>&1
-killall -9 vlc > /dev/null 2>&1
-killall -9 gateway > /dev/null 2>&1
-
+interrupted=0
+graceful_stop
