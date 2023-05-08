@@ -1,4 +1,5 @@
 #include <api/mictcp_core.h>
+#include <stdio.h>
 #include <sys/time.h>
 #include <sys/queue.h>
 #include <math.h>
@@ -13,7 +14,7 @@ int initialized = -1;
 int sys_socket;
 pthread_t listen_th;
 pthread_mutex_t lock;
-unsigned short  loss_rate = 0;
+unsigned short  loss_rate = 20;
 struct sockaddr_in remote_addr;
 
 /* This is for the buffer */
@@ -134,12 +135,15 @@ int IP_recv(mic_tcp_pdu* pk, mic_tcp_sock_addr* addr, unsigned long timeout)
     /* Convert the remainder to microseconds */
     tv.tv_usec = (timeout - tv.tv_sec * 1000) * 1000;
 
+    // printf("values of tv sec and usec : %ld, %ld\n",tv.tv_sec,tv.tv_usec);
     /* Create a reception buffer */
     int buffer_size = API_HD_Size + pk->payload.size;
     char *buffer = malloc(buffer_size);
-
-    if ((setsockopt(sys_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv))) >= 0) {
+    int setsockopt_return_value;
+    if ((setsockopt_return_value=setsockopt(sys_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv))) >= 0) {
+	    // printf("debug : %d\n, return value of setsockopt : %d\n",__LINE__,setsockopt_return_value);	
        result = recvfrom(sys_socket, buffer, buffer_size, 0, (struct sockaddr *)&tmp_addr, &tmp_addr_size);
+	    // printf("debug : %d\n",__LINE__);	
     }
 
     if (result != -1) {
@@ -162,6 +166,7 @@ int IP_recv(mic_tcp_pdu* pk, mic_tcp_sock_addr* addr, unsigned long timeout)
     /* Free the reception buffer */
     free(buffer);
 
+	printf("debug : %d\n",__LINE__);	
     return result;
 }
 

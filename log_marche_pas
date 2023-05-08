@@ -1,0 +1,104 @@
+source:
+[MIC-TCP] Appel de la fonction: mic_tcp_socket
+----------------------------------
+état du socket
+Socket File Descriptor: 0
+Socket Protocol State: IDLE
+Socket Address IP:
+Socket Address Port: 0
+Remote Address IP:
+Remote Address Port: 0
+Local Sequence Number: 0
+Remote Sequence Number: 0
+----------------------------------
+[TSOCK] Creation du socket MICTCP: OK
+------------------------------------------
+creation du pdu SYN:
+ACK Flag: 0
+FIN Flag: 0
+SYN Flag: 1
+Source Port: 0
+Destination Port: 1234
+Sequence Number: 0
+Acknowledgment Number: 4294967295
+Payload Size: 0
+Payload Data is NULL
+----------------------------------
+----------------------------------
+envoi du pdu SYN vers l'adresse :
+IP Address: 127.0.0.1
+Port: 1234
+----------------------------------
+puit
+[MIC-TCP] Appel de la fonction: mic_tcp_socket
+----------------------------------
+état du socket
+Socket File Descriptor: 0
+Socket Protocol State: IDLE
+Socket Address IP:
+Socket Address Port: 0
+Remote Address IP:
+Remote Address Port: 0
+Local Sequence Number: 0
+Remote Sequence Number: 0
+----------------------------------
+[TSOCK] Creation du socket MICTCP: OK
+[MIC-TCP] Appel de la fonction: mic_tcp_bind
+----------------------------------
+
+Socket File Descriptor: 0
+Socket Protocol State: WAITING
+Socket Address IP:
+Socket Address Port: 1234
+Remote Address IP:
+Remote Address Port: 0
+Local Sequence Number: 0
+Remote Sequence Number: 0
+[MICTCP-CORE] Demarrage du thread de reception reseau...
+----------------------------------
+[TSOCK] Bind du socket MICTCP: OK
+[MIC-TCP] Appel de la fonction: mic_tcp_accept
+----------------------------------
+état du socket en attendant l'établissement de connection
+Socket File Descriptor: 0
+Socket Protocol State: ACCEPTING
+Socket Address IP:
+Socket Address Port: 1234
+Remote Address IP:
+Remote Address Port: 0
+Local Sequence Number: 0
+Remote Sequence Number: 0
+----------------------------------
+je vais recv
+j'ai recv
+------------------------------------------
+pdu reçu
+ACK Flag: 0
+FIN Flag: 0
+SYN Flag: 1
+Source Port: 0
+Destination Port: 1234
+Sequence Number: 0
+Acknowledgment Number: 4294967295
+Payload Size: 0
+Payload Data is NULL
+----------------------------------
+[MIC-TCP] Appel de la fonction: process_syn_pdu
+------------------------------------------
+Construction du Pdu SYN ACK :
+
+ACK Flag: 1
+FIN Flag: 0
+SYN Flag: 1
+Source Port: 1234
+Destination Port: 0
+Sequence Number: 0
+Acknowledgment Number: 0
+Payload Size: 0
+Payload Data is NULL
+----------------------------------
+----------------------------------
+Envoi du PDU SYN ACK à l'adresse:
+IP Address: localhost
+Port: 0
+----------------------------------
