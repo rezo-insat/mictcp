@@ -1,3 +1,4 @@
+#include <pthread.h>
 #include <stdio.h>
 #include <mictcp.h>
 #include <api/mictcp_core.h>
@@ -28,6 +29,7 @@ typedef struct
 
 typedef struct
 {
+	int recpt;
 	int socket;
 	mic_tcp_pdu pdu_r;
 }arg_thread;
@@ -39,7 +41,7 @@ static int socket_desc = 0;
 static enhanced_socket tab_sockets[NBR_SOCKETS];
 int timeout = TIMEOUT_DEFAUT;
 int established = 0;
-pthread_t attente_ack_tid;
+pthread_t envoi_syn_ack_tid;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t end_accept_cond = PTHREAD_COND_INITIALIZER;
 char debug=1;
@@ -263,30 +265,34 @@ int mic_tcp_send(int mic_sock, char *mesg, int mesg_size)
 	display_mic_tcp_pdu(pdu, "creation du pdu data:");
 
 	display_mic_tcp_sock_addr(tab_sockets[mic_sock].dist_addr, "envoi du pdu data vers l'adresse :");
-
+	display_enhanced_socket(tab_sockets[mic_sock],"etat du socket");
 	int sent_size = IP_send(pdu, tab_sockets[mic_sock].dist_addr);
 	printf("Packet envoye\n");	
 	if (version<2) return sent_size;
 
 	tab_sockets[mic_sock].socket.state = WAITING;
-	mic_tcp_pdu pdu_r;
-	mic_tcp_sock_addr addr_r;
-	pdu_r.payload.size = PAYLOAD_SIZE;
+	  
+	pthread_t attente_ack_tid;
+	arg_thread* args = malloc(sizeof(arg_thread));
+
 	while (1)
 	{
+		args->recpt=-1;
+		printf("avant creation thread TAA\n");
+		pthread_create(&attente_ack_tid, NULL,attente_ack,(void *)args);
+		printf("aprés creation thread TAA\n");
+
 		sleep(timeout);
-	printf("%d\n",__LINE__);	
-		if (IP_recv(&pdu_r,&addr_r, 0) == -1){
-	printf("%d\n",__LINE__);	
+		if (pthread_cancel(attente_ack_tid)) printf("destruction du TAA");
+
+		if (args->recpt == -1){
 			sent_size = IP_send(pdu, tab_sockets[mic_sock].dist_addr);
-	printf("%d\n",__LINE__);	
 			printf("Pas de pdu recu, envoi d'un doublon\n");
 			continue;
 		}
-	printf("%d\n",__LINE__);	
-		display_mic_tcp_pdu(pdu_r,"pdu reçu :");
+		display_mic_tcp_pdu(args->pdu_r,"pdu reçu :");
 
-		if (pdu_r.header.ack == 1 && (tab_sockets[mic_sock].NoSeqLoc == pdu_r.header.ack_num)){
+		if (args->pdu_r.header.ack == 1 && (tab_sockets[mic_sock].NoSeqLoc ==args->pdu_r.header.ack_num)){
 			printf("le bon Ack a été reçu\n");
 			tab_sockets[mic_sock].socket.state = ESTABLISHED;
 
@@ -294,7 +300,7 @@ int mic_tcp_send(int mic_sock, char *mesg, int mesg_size)
 			display_enhanced_socket(tab_sockets[mic_sock], "État du socket aprés la reception du ack");
 			return sent_size;
 		
-		}else if(pdu_r.header.ack == 1 && pdu_r.header.syn == 1){
+		}else if(args->pdu_r.header.ack == 1 && args->pdu_r.header.syn == 1){
 			printf("PDU SYN ACK recu a nouveau (Doublon) \n");
 			mic_tcp_pdu pdu_d;
 
@@ -303,7 +309,7 @@ int mic_tcp_send(int mic_sock, char *mesg, int mesg_size)
 				tab_sockets[mic_sock].socket.addr.port,
 				tab_sockets[mic_sock].dist_addr.port,
 				-1,
-				pdu_r.header.seq_num,
+				args->pdu_r.header.seq_num,
 				0,1,0,
 				NULL,0
 			);
@@ -391,7 +397,7 @@ void process_syn_pdu(mic_tcp_pdu pdu,mic_tcp_sock_addr addr, int mic_sock){
 	args->pdu_r=pdu_r;
 
 	printf("avant creation thread TESA\n");
-	pthread_create(&attente_ack_tid, NULL,attente_ack,(void *)args);
+	pthread_create(&envoi_syn_ack_tid, NULL,attente_ack,(void *)args);
 	printf("aprés creation thread TESA\n");
 
 
@@ -605,28 +611,37 @@ void display_mic_tcp_sock_addr(mic_tcp_sock_addr addr, char* prefix) {
 }
 
 
-
 void * attente_ack(void * arg) {
-	printf(debug?"début du TESA : thread d'envoi de SYN ACK'\n":"");
+	printf(debug?"début du TAA: thread d'attente de ACK'\n":"");
 	arg_thread* args = (arg_thread*)arg;
-	while (1)
-		{
-			if (tab_sockets[args->socket].socket.state == SYN_RECEIVED)
-			{
+	
 
-				display_mic_tcp_pdu(args->pdu_r, "renvoi du pdu syn ack");
-				display_mic_tcp_sock_addr(tab_sockets[args->socket].dist_addr,"a l'adresse");
-				IP_send(args->pdu_r, tab_sockets[args->socket].dist_addr);
-				printf(debug?"TESA: je renvoie le Syn ack\n":"");
-			}
-			else if (tab_sockets[args->socket].socket.state == ESTABLISHED)
-			{
-				printf("!Destruction du TESA!");
-				pthread_exit(NULL);
-			}
-			sleep(timeout);
-		}
+	args->recpt=IP_recv(&args->pdu_r,NULL, 0) ;
+	printf("TAA: reception effectuee, autodestruction entamee\n");
+	pthread_exit(NULL);
 }
+
+// void * attente_ack(void * arg) {
+// 	printf(debug?"début du TESA : thread d'envoi de SYN ACK'\n":"");
+// 	arg_thread* args = (arg_thread*)arg;
+// 	while (1)
+// 		{
+// 			if (tab_sockets[args->socket].socket.state == SYN_RECEIVED)
+// 			{
+
+// 				display_mic_tcp_pdu(args->pdu_r, "renvoi du pdu syn ack");
+// 				display_mic_tcp_sock_addr(tab_sockets[args->socket].dist_addr,"a l'adresse");
+// 				IP_send(args->pdu_r, tab_sockets[args->socket].dist_addr);
+// 				printf(debug?"TESA: je renvoie le Syn ack\n":"");
+// 			}
+// 			else if (tab_sockets[args->socket].socket.state == ESTABLISHED)
+// 			{
+// 				printf("!Destruction du TESA!");
+// 				pthread_exit(NULL);
+// 			}
+// 			sleep(timeout);
+// 		}
+// }
 
 void error(char * message, int line){
     printf("%s at line %d\n",message,line);
