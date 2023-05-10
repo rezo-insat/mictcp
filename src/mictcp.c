@@ -45,7 +45,7 @@ pthread_t envoi_syn_ack_tid;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t end_accept_cond = PTHREAD_COND_INITIALIZER;
 char debug=1;
-char version=1;
+char version=2;
 //================================== SIGNATURES DES FONCTIONS PRIVEES =============================
 
 int valid_socket(int socket);
