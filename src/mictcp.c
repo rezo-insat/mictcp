@@ -3,9 +3,9 @@
 #include <mictcp.h>
 #include <api/mictcp_core.h>
 #define NBR_SOCKETS 1024
-#define TIMEOUT_DEFAUT 5
+#define TIMEOUT_DEFAUT 5000000
 #define WINDOW_SIZE 10
-#define LOSS_ACCEPTABILITY 0 // sur 10
+#define LOSS_ACCEPTABILITY 20 // sur 100
 #define ATTENTE_ACK 1
 #define PAYLOAD_SIZE 64
 
@@ -45,7 +45,7 @@ pthread_t envoi_syn_ack_tid;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t end_accept_cond = PTHREAD_COND_INITIALIZER;
 char debug=1;
-char version=2;
+char version=4;
 //================================== SIGNATURES DES FONCTIONS PRIVEES =============================
 
 int valid_socket(int socket);
@@ -60,6 +60,7 @@ void addValueCircularBuff(circularBuffer* buffer, char Value );
 int accept_loss(int socket);
 void set_mic_tcp_pdu(mic_tcp_pdu* pdu, unsigned short source_port, unsigned short dest_port, unsigned int seq_num, unsigned int ack_num, unsigned char syn, unsigned char ack, unsigned char fin, char* data, int size);
 void process_syn_pdu(mic_tcp_pdu pdu,mic_tcp_sock_addr addr, int mic_sock);
+void * envoi_syn_ack(void * arg);
 //================================== FONCTIONS DE MICTCP =============================
 
 
@@ -85,7 +86,7 @@ int mic_tcp_socket(start_mode sm)
 	{
 		return -1;
 	}
-
+	
 	return socket->socket.fd;
 }
 
@@ -155,6 +156,15 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
 	tab_sockets[socket].dist_addr = addr;
 	tab_sockets[socket].NoSeqLoc = 0;
 
+
+	if (version>2){
+		circularBuffer* buffer = &tab_sockets[socket].buffer;
+		buffer->last_index = 0;
+		for (int i = 0; i<WINDOW_SIZE;i++){
+			buffer->table[i]=0;
+		}
+	}
+	
 	if (version<4){
 		tab_sockets[socket].socket.state = ESTABLISHED;
 		display_enhanced_socket(tab_sockets[socket], "État du socket aprés l'établissement de la connection :");
@@ -180,33 +190,44 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
 
 	display_mic_tcp_sock_addr(addr, "envoi du pdu SYN vers l'adresse :");
 
-	mic_tcp_pdu pdu_r;
-	mic_tcp_sock_addr addr_r;
 	
 	IP_send(pdu, addr);
     // display_enhanced_socket(tab_sockets[socket], "état du socket en attente du syn ack :");
-	while (1){
-		sleep(timeout);
-		if (IP_recv(&pdu_r,&addr_r, timeout) == -1){
-			if (tab_sockets[socket].socket.state == ESTABLISHED) return 0;
 
+	pthread_t attente_ack_tid;
+	arg_thread* args = malloc(sizeof(arg_thread));
+
+	while (1){
+
+		args->recpt=-1;
+		printf("avant creation thread TAA\n");
+		pthread_create(&attente_ack_tid, NULL,attente_ack,(void *)args);
+		printf("aprés creation thread TAA\n");
+
+		usleep(timeout);
+		if (pthread_cancel(attente_ack_tid)) printf("destruction du TAA");
+
+		if (args->recpt == -1){
+			if (tab_sockets[socket].socket.state == ESTABLISHED){
+				break;	
+			}
 			IP_send(pdu, tab_sockets[socket].dist_addr);
 			printf("SYN ACK pas encore recu, envoi d'un doublon du syn\n");
 			continue;
 		}
-		display_mic_tcp_pdu(pdu_r,"pdu reçu :");
+		display_mic_tcp_pdu(args->pdu_r,"pdu reçu :");
 
-		if (pdu_r.header.ack == 1 && pdu_r.header.syn == 1 /*on s'occuppe plus tard de la verif du num de seq*/){
+		if (args->pdu_r.header.ack == 1 && args->pdu_r.header.syn == 1 /*on s'occuppe plus tard de la verif du num de seq*/){
 			printf("Bon PDU SYN ACK recu \n");
 
-			tab_sockets[socket].NoSeqDist = pdu_r.header.seq_num; // récupérer n° de seq du server 
+			tab_sockets[socket].NoSeqDist = args->pdu_r.header.seq_num; // récupérer n° de seq du server 
 
 			set_mic_tcp_pdu(
 			&pdu,
 			tab_sockets[socket].socket.addr.port,
 			tab_sockets[socket].dist_addr.port,
 			-1,
-			pdu_r.header.seq_num,
+			args->pdu_r.header.seq_num,
 			0,1,0,
 			NULL,0
 			);
@@ -224,7 +245,6 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
 			tab_sockets[socket].socket.state = ESTABLISHED;
 			
 /*on attend naivement l'arrivee d'un nouveau syn ack au cas ou le ack a ete perdu, puis on relance la boucle, pour verifier*/
-			sleep(ATTENTE_ACK*timeout);
 			continue;
 			
 		}
@@ -248,7 +268,7 @@ int mic_tcp_send(int mic_sock, char *mesg, int mesg_size)
 
 	if (tab_sockets[mic_sock].socket.state != ESTABLISHED)
 	{
-		printf("l'utilisateur n’es pas connecté \n");
+		printf("l'utilisateur n’est pas connecté \n");
 		exit(1);
 	}
 	// create pdu
@@ -282,10 +302,22 @@ int mic_tcp_send(int mic_sock, char *mesg, int mesg_size)
 		pthread_create(&attente_ack_tid, NULL,attente_ack,(void *)args);
 		printf("aprés creation thread TAA\n");
 
-		sleep(timeout);
+		usleep(timeout);
 		if (pthread_cancel(attente_ack_tid)) printf("destruction du TAA");
 
-		if (args->recpt == -1){
+		if (args->recpt == -1){ // Si on ne reçoit pas le ACK
+			if (version>2){
+				if (accept_loss(mic_sock)) { // Si on peut accepter la perte, on ne retransmet pas
+					addValueCircularBuff(&tab_sockets[mic_sock].buffer,0);
+					printf("===========Perte Acceptée============\n");
+					tab_sockets[mic_sock].socket.state = ESTABLISHED;
+					
+
+					return sent_size;
+				} else {
+					printf("============Perte inacceptable=============\n");
+				}
+			}
 			sent_size = IP_send(pdu, tab_sockets[mic_sock].dist_addr);
 			printf("Pas de pdu recu, envoi d'un doublon\n");
 			continue;
@@ -298,6 +330,9 @@ int mic_tcp_send(int mic_sock, char *mesg, int mesg_size)
 
 			tab_sockets[mic_sock].NoSeqLoc = ((tab_sockets[mic_sock].NoSeqLoc + 1) % 2); //maj du no de seq uniquement lorsque ACK reçu (= synchronisation du noseq entre puits et src)
 			display_enhanced_socket(tab_sockets[mic_sock], "État du socket aprés la reception du ack");
+			if (version>2){
+				addValueCircularBuff(&tab_sockets[mic_sock].buffer, 1);
+			}
 			return sent_size;
 		
 		}else if(args->pdu_r.header.ack == 1 && args->pdu_r.header.syn == 1){
@@ -323,7 +358,7 @@ int mic_tcp_send(int mic_sock, char *mesg, int mesg_size)
 			printf("mauvais pdu reçu\n");
 		}
 		
-
+		
 		// si ACK de bon numéro de séquence
 		// addValueCircularBuff(&tab_sockets[mic_sock].buffer,1); // PDU bien reçu
 		//update seq num ?
@@ -397,7 +432,7 @@ void process_syn_pdu(mic_tcp_pdu pdu,mic_tcp_sock_addr addr, int mic_sock){
 	args->pdu_r=pdu_r;
 
 	printf("avant creation thread TESA\n");
-	pthread_create(&envoi_syn_ack_tid, NULL,attente_ack,(void *)args);
+	pthread_create(&envoi_syn_ack_tid, NULL,envoi_syn_ack,(void *)args);
 	printf("aprés creation thread TESA\n");
 
 
@@ -598,7 +633,14 @@ void display_enhanced_socket(enhanced_socket sock,char* prefix) {
 	printf("Remote Address Port: %hu\n", sock.dist_addr.port);
 	printf("Local Sequence Number: %d\n", sock.NoSeqLoc);
 	printf("Remote Sequence Number: %d\n", sock.NoSeqDist);
-	printf("----------------------------------\n");
+	if (version>2){
+		printf("Buffer: --------------- \n");
+		for (int i =0;i<WINDOW_SIZE; i++){
+			printf(" %d ;",sock.buffer.table[i]);
+		}
+		printf("\n-----------------\n");
+	}
+	printf("\n----------------------------------\n");
 }
 
 void display_mic_tcp_sock_addr(mic_tcp_sock_addr addr, char* prefix) {
@@ -621,27 +663,27 @@ void * attente_ack(void * arg) {
 	pthread_exit(NULL);
 }
 
-// void * attente_ack(void * arg) {
-// 	printf(debug?"début du TESA : thread d'envoi de SYN ACK'\n":"");
-// 	arg_thread* args = (arg_thread*)arg;
-// 	while (1)
-// 		{
-// 			if (tab_sockets[args->socket].socket.state == SYN_RECEIVED)
-// 			{
+void * envoi_syn_ack(void * arg) {
+	printf(debug?"début du TESA : thread d'envoi de SYN ACK'\n":"");
+	arg_thread* args = (arg_thread*)arg;
+	while (1)
+		{
+			if (tab_sockets[args->socket].socket.state == SYN_RECEIVED)
+			{
 
-// 				display_mic_tcp_pdu(args->pdu_r, "renvoi du pdu syn ack");
-// 				display_mic_tcp_sock_addr(tab_sockets[args->socket].dist_addr,"a l'adresse");
-// 				IP_send(args->pdu_r, tab_sockets[args->socket].dist_addr);
-// 				printf(debug?"TESA: je renvoie le Syn ack\n":"");
-// 			}
-// 			else if (tab_sockets[args->socket].socket.state == ESTABLISHED)
-// 			{
-// 				printf("!Destruction du TESA!");
-// 				pthread_exit(NULL);
-// 			}
-// 			sleep(timeout);
-// 		}
-// }
+				display_mic_tcp_pdu(args->pdu_r, "renvoi du pdu syn ack");
+				display_mic_tcp_sock_addr(tab_sockets[args->socket].dist_addr,"a l'adresse");
+				IP_send(args->pdu_r, tab_sockets[args->socket].dist_addr);
+				printf(debug?"TESA: je renvoie le Syn ack\n":"");
+			}
+			else if (tab_sockets[args->socket].socket.state == ESTABLISHED)
+			{
+				printf("!Destruction du TESA!");
+				pthread_exit(NULL);
+			}
+			usleep(timeout);
+		}
+}
 
 void error(char * message, int line){
     printf("%s at line %d\n",message,line);
@@ -653,7 +695,8 @@ int accept_loss(int socket){
 	for(int i = 0; i < WINDOW_SIZE; i++){ // somme de tous les packets reçus
 		sum += tab_sockets[socket].buffer.table[i];
 	}
-	if(sum < WINDOW_SIZE - LOSS_ACCEPTABILITY){// si le nombre de packets reçus est inférieur au nombre acceptable
+
+	if(sum < WINDOW_SIZE*(100-LOSS_ACCEPTABILITY)/100){// si le nombre de packets reçus est inférieur au nombre acceptable
 		return 0; // on accepte pas la perte
 	}
 	return 1;
@@ -661,4 +704,5 @@ int accept_loss(int socket){
 
 void addValueCircularBuff(circularBuffer* buffer, char Value ){
 	buffer->table[buffer->last_index+1%WINDOW_SIZE]=Value;
+	buffer->last_index = buffer->last_index + 1 % WINDOW_SIZE;
 }
