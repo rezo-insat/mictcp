@@ -3,7 +3,7 @@
 #include <mictcp.h>
 #include <api/mictcp_core.h>
 #define NBR_SOCKETS 1024
-#define TIMEOUT_DEFAUT 5000000
+#define TIMEOUT_DEFAUT 1000
 #define WINDOW_SIZE 10
 #define LOSS_ACCEPTABILITY 20 // sur 100
 #define ATTENTE_ACK 1
