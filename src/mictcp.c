@@ -5,7 +5,7 @@
 #define NBR_SOCKETS 1024
 #define TIMEOUT_DEFAUT 1000
 #define WINDOW_SIZE 10
-#define LOSS_ACCEPTABILITY 20 // sur 100
+#define LOSS_ACCEPTABILITY 2 // sur 100
 #define ATTENTE_ACK 1
 #define PAYLOAD_SIZE 64
 
@@ -45,7 +45,7 @@ pthread_t envoi_syn_ack_tid;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t end_accept_cond = PTHREAD_COND_INITIALIZER;
 char debug=1;
-char version=3;
+char version=2;
 //================================== SIGNATURES DES FONCTIONS PRIVEES =============================
 
 int valid_socket(int socket);
