@@ -43,7 +43,7 @@ Pour compiler mictcp et générer les exécutables des applications de test depu
 
 Deux applicatoins de test sont fournies, tsock_texte et tsock_video, elles peuvent être lancées soit en mode puits, soit en mode source selon la syntaxe suivante:
 
-    Usage: ./tsock_texte [-p|-s]
+    Usage: ./tsock_texte [-p|-s destination] port
     Usage: ./tsock_video [[-p|-s] [-t (tcp|mictcp)]
 
 Seul tsock_video permet d'utiliser, au choix, votre protocole mictcp ou une émulation du comportement de tcp sur un réseau avec pertes.
